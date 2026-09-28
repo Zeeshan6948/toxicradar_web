@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Local Data, Logs & Exports
+data/settings.json
+data/uploads/
+data/*.xlsx
+*.xlsx
+*.xls
+*.csv
+*.log
+*.backup*
+
+# Build & Release Artifacts
+release/
+dist/
+build/
+__pycache__/
+
+# OS System Files
+.DS_Store
+Thumbs.db

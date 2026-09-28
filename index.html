@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ToxicRadar</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar-nav">
+        <div class="brand-block">
+          <p class="eyebrow">Leadership Communication Lab</p>
+          <h1>ToxicRadar</h1>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-btn active" data-view="overview" data-period="">Overview</button>
+          <button class="nav-btn" data-view="compose" data-period="">New Message+</button>
+          <button class="nav-btn" data-view="reports" data-period="today">Daily Report</button>
+          <button class="nav-btn" data-view="reports" data-period="7">Weekly Report</button>
+          <button class="nav-btn" data-view="reports" data-period="30">Monthly Report</button>
+          <button class="nav-btn" data-view="reports" data-period="90">Yearly Report</button>
+          <button class="nav-btn" data-view="reports" data-period="all">Total History</button>
+        </nav>
+
+        <div class="sidebar-actions">
+          <div class="excel-tools">
+            <button id="open-excel-btn" class="ghost-btn excel-btn">
+              <img
+                src="Microsoft_Excel-Logo.wine.svg"
+                alt="Excel"
+                class="excel-btn-icon"
+              />
+              <span>Open Excel</span>
+            </button>
+            <button id="choose-excel-btn" type="button" class="ghost-btn choose-excel-btn">Choose Excel File</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <button id="settings-btn" type="button" class="settings-icon-btn" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+            <path d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" />
+          </svg>
+        </button>
+        <section id="overview-view" class="workspace-view active">
+          <header class="hero-banner">
+            <p class="hero-line">
+              Effective leaders typically use respectful and autonomy-supportive communication
+            </p>
+          </header>
+
+          <section class="headline-metrics">
+            <button id="negative-summary" type="button" class="headline-metric negative">
+              <span class="metric-value">0%</span>
+              <span class="metric-label">negative</span>
+            </button>
+            <button id="neutral-summary" type="button" class="headline-metric neutral">
+              <span class="metric-value">0%</span>
+              <span class="metric-label">neutral</span>
+            </button>
+            <button id="positive-summary" type="button" class="headline-metric positive">
+              <span class="metric-value">0%</span>
+              <span class="metric-label">positive</span>
+            </button>
+            <button id="clear-summary-filter" type="button" class="ghost-btn summary-filter-clear hidden">
+              Show all
+            </button>
+          </section>
+
+          <section class="email-summary-card light-card">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow red">Summary</p>
+                <h2 id="email-summary-title">Emails <span class="summary-title-count">(0)</span></h2>
+              </div>
+            </div>
+
+            <div class="table-wrap summary-table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="subject"><span class="summary-sort-label nowrap">Subject</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="date"><span class="summary-sort-label nowrap">Date</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="overallToxicity"><span class="summary-sort-label">Overall<br />Toxicity</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="level"><span class="summary-sort-label nowrap">Level</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="genuineEgoisticBehaviors"><span class="summary-sort-label"><span class="nowrap">Genuine Egoistic</span><br />Behaviors</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="takingCredit"><span class="summary-sort-label">Taking<br />Credit</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="exertingPressure"><span class="summary-sort-label">Exerting<br />Pressure</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="underminingDevelopment"><span class="summary-sort-label">Undermining<br />Development</span></button></th>
+                    <th><button class="summary-sort-btn" type="button" data-summary-sort="manipulating"><span class="summary-sort-label nowrap">Manipulating</span></button></th>
+                  </tr>
+                </thead>
+                <tbody id="email-summary-body">
+                  <tr class="empty-row">
+                    <td colspan="9">No Excel-based email summary available yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="compose-view" class="workspace-view hidden">
+          <section class="compose-layout-board single-column">
+            <article class="compose-panel">
+              <div class="compose-panel-head">
+                <p class="eyebrow red">Compose Message</p>
+                <h2>Simulate a message directly inside the desktop tool</h2>
+              </div>
+
+              <div class="compose-fields">
+                <label class="field">
+                  <span>To</span>
+                  <input id="compose-to" type="text" placeholder="recipient@company.com" />
+                </label>
+
+                <label class="field">
+                  <span>Subject</span>
+                  <input id="compose-subject" type="text" placeholder="Enter a subject line" />
+                </label>
+              </div>
+
+              <div class="field full-width message-field">
+                <div class="message-field-head">
+                  <label for="compose-body">Message</label>
+                  <div class="live-tools">
+                    <button id="live-warning-toggle" class="ghost-btn live-toggle-btn" type="button">
+                      <span class="live-toggle-box" aria-hidden="true"></span>
+                      <span id="live-warning-toggle-label">Activate Live Warning</span>
+                    </button>
+                    <button id="live-warning-info" class="info-icon-btn" type="button" aria-label="Live Warning info" title="Live Warning info">i</button>
+                  </div>
+                </div>
+                <div class="compose-editor-wrap">
+                  <div id="live-warning-bubble" class="live-warning-bubble hidden" aria-live="polite">
+                    <div class="live-warning-badge">Warning</div>
+                    <p id="live-warning-text" class="live-warning-text">
+                      Your message has exploitative leadership Pressure and manipulation detected.
+                    </p>
+                    <div id="live-warning-suggestion" class="live-warning-suggestion hidden"></div>
+                    <p id="live-warning-question" class="live-warning-question">
+                      Do you want to improve your message?
+                    </p>
+                    <div class="live-warning-actions">
+                      <button id="live-warning-yes" class="accent-btn" type="button">Yes</button>
+                      <button id="live-warning-no" class="ghost-btn" type="button">No</button>
+                    </div>
+                  </div>
+
+                  <div class="compose-textarea-layer">
+                    <textarea
+                      id="compose-body"
+                      class="compose-textarea"
+                      placeholder="Type the message you want to evaluate..."
+                    ></textarea>
+                    <div
+                      id="compose-highlight-overlay"
+                      class="compose-highlight-overlay hidden"
+                      aria-hidden="true"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="compose-actions">
+                <div class="compose-action-buttons">
+                  <button id="compose-send-btn" class="accent-btn">Send for Analysis</button>
+                  <button id="compose-undo-rewrite-btn" class="ghost-btn hidden" type="button">
+                    Undo Rewrite
+                  </button>
+                </div>
+                <span id="compose-status" class="muted">
+                  The draft stays local and is analyzed inside the desktop app.
+                </span>
+              </div>
+            </article>
+
+            <section class="insights-panel">
+              <article id="compose-result-card" class="compose-result-card light-card hidden">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow red">Latest Compose Result</p>
+                    <h2>Single Message Review</h2>
+                  </div>
+                </div>
+
+                <div id="compose-result-empty" class="compose-empty">
+                  No composed message has been analyzed yet.
+                </div>
+
+                <div id="compose-result-panel" class="compose-result-panel hidden">
+                  <div class="compose-result-meta">
+                    <div>
+                      <span class="stat-label">Subject</span>
+                      <strong id="compose-result-subject">(No Subject)</strong>
+                    </div>
+                    <div>
+                      <span class="stat-label">Recipient</span>
+                      <strong id="compose-result-recipient">(No Recipient)</strong>
+                    </div>
+                  </div>
+
+                  <div class="compose-result-badges">
+                    <span id="compose-flag-badge"></span>
+                    <span id="compose-score-badge"></span>
+                  </div>
+
+                  <div class="compose-notes-box">
+                    <span class="stat-label">Notes</span>
+                    <div id="compose-result-notes" class="notes-box compact"></div>
+                  </div>
+
+                  <div class="compose-actions">
+                    <button id="compose-details-btn" class="ghost-btn" disabled>Open Details</button>
+                    <span id="compose-log-path" class="muted mono"></span>
+                  </div>
+                </div>
+              </article>
+            </section>
+          </section>
+        </section>
+
+        <section id="reports-view" class="workspace-view hidden">
+          <header class="reports-head">
+            <div>
+              <p class="eyebrow red">Batch History</p>
+              <h2 id="reports-title">Total History</h2>
+            </div>
+          </header>
+
+          <section id="reports-content" class="report-dashboard">
+            <section class="report-kpi-grid">
+              <article class="light-card report-kpi">
+                <span class="stat-label">Messages</span>
+                <strong id="report-total-count">0</strong>
+              </article>
+              <article class="light-card report-kpi">
+                <span class="stat-label">Negative</span>
+                <strong id="report-high-count">0</strong>
+              </article>
+              <article class="light-card report-kpi">
+                <span class="stat-label">Neutral</span>
+                <strong id="report-neutral-count">0</strong>
+              </article>
+              <article class="light-card report-kpi">
+                <span class="stat-label">Positive</span>
+                <strong id="report-clear-count">0</strong>
+              </article>
+            </section>
+
+            <section id="dimension-score-card" class="report-chart-card dimension-score-card light-card hidden">
+              <div class="report-chart-topline">
+                <div>
+                  <h3 id="dimension-score-title">Improvement</h3>
+                  <p id="dimension-score-caption" class="muted">Load or choose an Excel file to populate the chart.</p>
+                </div>
+                <div id="dimension-score-legend" class="report-legend" aria-label="Improvement legend"></div>
+              </div>
+
+              <div id="dimension-score-wrap" class="report-chart-wrap">
+                <svg id="dimension-score-chart" class="report-histogram" role="img" aria-labelledby="dimension-score-title"></svg>
+                <div id="dimension-score-empty" class="report-chart-empty">No improvement data available.</div>
+                <div id="dimension-score-tooltip" class="report-chart-tooltip"></div>
+              </div>
+            </section>
+
+            <section class="report-chart-card light-card">
+              <div class="report-chart-topline">
+                <div>
+                  <p class="eyebrow red">Histogram Analytics</p>
+                  <h3 id="report-chart-heading">All Messages</h3>
+                  <h3 id="report-axis-title">Messages by month</h3>
+                  <p id="report-chart-caption" class="muted">Load or choose an Excel file to populate the chart.</p>
+                </div>
+                <div class="report-chart-side">
+                  <div id="report-legend" class="report-legend" aria-label="Chart legend"></div>
+                  <div class="report-chart-controls" aria-label="Chart options">
+                    <label class="field report-metric-field">
+                      <span>Metric</span>
+                      <select id="report-metric-select">
+                        <option value="count">Message Count</option>
+                        <option value="riskPercent">High Risk %</option>
+                      </select>
+                    </label>
+
+                    <label class="field report-chart-type-field">
+                      <span>Chart</span>
+                      <select id="report-chart-type-select">
+                        <option value="bar">Bars</option>
+                        <option value="line" selected>Line</option>
+                        <option value="pie">Pie</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div id="report-chart-wrap" class="report-chart-wrap">
+                <svg id="report-histogram" class="report-histogram" role="img" aria-labelledby="report-axis-title"></svg>
+                <div id="report-chart-empty" class="report-chart-empty">No message data available.</div>
+                <div id="report-chart-tooltip" class="report-chart-tooltip"></div>
+              </div>
+
+              <div id="report-month-nav" class="report-month-nav hidden" aria-label="Monthly navigation">
+                <button id="report-prev-month" type="button" class="ghost-btn report-month-arrow" aria-label="Previous month">‹</button>
+                <span id="report-month-label" class="report-month-label">Month</span>
+                <button id="report-next-month" type="button" class="ghost-btn report-month-arrow" aria-label="Next month">›</button>
+              </div>
+
+              <div id="report-week-nav" class="report-period-nav hidden" aria-label="Weekly navigation">
+                <button id="report-prev-week" type="button" class="ghost-btn report-period-arrow" aria-label="Previous week">‹</button>
+                <span id="report-week-label" class="report-period-label">Week</span>
+                <button id="report-next-week" type="button" class="ghost-btn report-period-arrow" aria-label="Next week">›</button>
+              </div>
+
+              <div id="report-day-nav" class="report-period-nav hidden" aria-label="Daily navigation">
+                <button id="report-prev-day" type="button" class="ghost-btn report-period-arrow" aria-label="Previous day">‹</button>
+                <span class="report-date-trigger">
+                  <button id="report-day-calendar-btn" type="button" class="report-calendar-btn" aria-label="Choose date" title="Choose date">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <rect x="3" y="4" width="18" height="17" rx="2"></rect>
+                      <path d="M8 2v4M16 2v4M3 10h18"></path>
+                    </svg>
+                  </button>
+                  <span id="report-day-label" class="report-period-label">Date</span>
+                </span>
+                <input id="report-day-picker" class="report-date-picker" type="date" aria-label="Choose report date" />
+                <button id="report-next-day" type="button" class="ghost-btn report-period-arrow" aria-label="Next day">›</button>
+              </div>
+
+              <div id="report-year-nav" class="report-period-nav hidden" aria-label="Yearly navigation">
+                <button id="report-prev-year" type="button" class="ghost-btn report-period-arrow" aria-label="Previous year">‹</button>
+                <span id="report-year-label" class="report-period-label">Year</span>
+                <button id="report-next-year" type="button" class="ghost-btn report-period-arrow" aria-label="Next year">›</button>
+              </div>
+
+              <div id="report-history-nav" class="report-period-nav report-day-nav hidden" aria-label="Total history date range">
+                <span id="report-history-label" class="report-period-label">History</span>
+              </div>
+            </section>
+          </section>
+        </section>
+
+        <div id="legacy-report-state" hidden>
+          <button id="load-pst-btn" type="button"></button>
+          <button id="export-outlook-btn" type="button"></button>
+          <select id="period-select">
+            <option value="today">Today</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all" selected>All</option>
+          </select>
+          <button id="analyze-btn" type="button"></button>
+          <button id="cancel-btn" type="button"></button>
+          <button id="export-btn" type="button"></button>
+          <strong id="pst-path"></strong>
+          <span id="email-count"></span>
+          <div id="progress-fill"></div>
+          <span id="progress-text"></span>
+          <span id="status-text"></span>
+          <div id="summary-text"></div>
+          <p id="table-caption"></p>
+          <div id="results-body"></div>
+        </div>
+      </main>
+    </div>
+
+    <div id="details-modal" class="modal hidden">
+      <div class="modal-backdrop" data-close-modal="details-modal"></div>
+      <div class="modal-panel details-modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Email Analysis</p>
+            <h3 id="modal-title">Details</h3>
+          </div>
+          <button class="icon-btn" data-close-modal="details-modal">Close</button>
+        </div>
+
+        <div class="modal-meta">
+          <span id="modal-recipients" class="mono"></span>
+          <span id="modal-date" class="mono"></span>
+        </div>
+
+        <div class="details-layout">
+          <section class="modal-section original-email-panel">
+            <h4>Email Comparison</h4>
+            <div class="email-card">
+              <div class="email-meta-grid">
+                <div class="email-meta-item">
+                  <span class="email-meta-label">From</span>
+                  <div id="modal-sender" class="email-meta-value"></div>
+                </div>
+                <div class="email-meta-item">
+                  <span class="email-meta-label">To</span>
+                  <div id="modal-to" class="email-meta-value"></div>
+                </div>
+                <div class="email-meta-item">
+                  <span class="email-meta-label">Date</span>
+                  <div id="modal-date-full" class="email-meta-value"></div>
+                </div>
+                <div class="email-meta-item full-span">
+                  <span class="email-meta-label">Subject</span>
+                  <div id="modal-subject-full" class="email-meta-value"></div>
+                </div>
+              </div>
+              <div class="email-comparison-grid">
+                <div class="comparison-column">
+                  <h5>Original Text</h5>
+                  <div id="modal-body-full" class="email-body-box"></div>
+                </div>
+                <div id="modal-rewrite-section" class="comparison-column hidden">
+                  <h5>Rewritten Text</h5>
+                  <div id="modal-rewrite" class="rewrite-content"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="modal-section analysis-panel">
+            <h4>Analysis</h4>
+            <div class="table-wrap inner-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Dimension</th>
+                    <th>Present</th>
+                    <th>Score</th>
+                    <th>Evidence</th>
+                  </tr>
+                </thead>
+                <tbody id="modal-dimensions"></tbody>
+              </table>
+            </div>
+
+            <div class="analysis-notes-block">
+              <h4>Notes</h4>
+              <div id="modal-notes" class="notes-box"></div>
+            </div>
+
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-panel narrow">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Application Settings</p>
+            <h3>OpenAI API Key</h3>
+          </div>
+          <button class="modal-close-btn" type="button" data-close-modal="settings-modal" aria-label="Close settings">
+            &times;
+          </button>
+        </div>
+
+        <p class="muted">
+          Enter your OpenAI API key to enable message analysis. You can update this later from the
+          sidebar.
+        </p>
+
+        <label class="field full-width">
+          <span>OpenAI API Key</span>
+          <input id="api-key-input" type="password" placeholder="sk-..." />
+        </label>
+
+        <label class="field full-width">
+          <span>Usage Reminder</span>
+          <select id="reminder-interval-select">
+            <option value="0">Off</option>
+            <option value="7">Every 7 days</option>
+            <option value="14">Every 14 days</option>
+            <option value="30">Every 30 days</option>
+          </select>
+          <button id="test-reminder-btn" class="ghost-btn settings-save-btn" type="button">Send Test Reminder</button>
+        </label>
+
+        <div class="settings-usage-card">
+          <span class="stat-label">API Usage this month</span>
+          <strong id="api-usage-summary">~0 tokens ($0.00 estimated)</strong>
+        </div>
+
+        <div class="modal-actions">
+          <button id="save-settings-btn" class="accent-btn settings-save-btn">Save Settings</button>
+        </div>
+
+        <p id="settings-feedback" class="muted"></p>
+      </div>
+    </div>
+
+    <!-- Hidden file inputs for web version -->
+    <input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display: none;" />
+    <input type="file" id="pst-file-input" accept=".pst" style="display: none;" />
+
+    <script src="api-client.js"></script>
+    <script src="renderer.js"></script>
+  </body>
+</html>

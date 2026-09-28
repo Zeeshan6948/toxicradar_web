@@ -1,0 +1,140 @@
+ToxicRadar Communication Quality Score
+======================================
+
+Purpose
+-------
+The Total History trend graph shows how the quality of analyzed email communication changes over time.
+Higher values mean more respectful and autonomy-supportive communication. Lower values mean stronger
+toxic or exploitative signals.
+
+The score is designed as a continuous trend measure, not as a simple positive/negative percentage.
+This is useful for scientific analysis because it preserves severity information from the underlying
+dimension ratings.
+
+
+Input Scores
+------------
+Each analyzed email contains five behavioral dimension scores:
+
+1. Genuine Egoistic Behaviors
+2. Taking Credit
+3. Exerting Pressure
+4. Undermining Development
+5. Manipulating
+
+Each dimension is scored from 1 to 5:
+
+1 = minimal / neutral or constructive
+2 = low / minor or ambiguous signal
+3 = moderate / probable exploitative tone
+4 = high / clear exploitative behavior
+5 = very high / explicit exploitative tone
+
+Important: In the raw dimension scores, higher means worse.
+
+For statistical consistency, ToxicRadar stores all five dimension scores for every analyzed email.
+This also applies when a dimension has score 1. Score-1 dimensions may be omitted from a compact
+human-readable table, but they must still exist in the machine-readable analysis record and in the
+Excel tracking columns.
+
+If an older Excel record does not contain one of the five dimensions, ToxicRadar treats that missing
+dimension as score 1 for backward-compatible dashboard statistics.
+
+
+Email-Level Formula
+-------------------
+For each email, ToxicRadar first computes the mean toxicity across the five dimensions:
+
+dimensionToxicityScore =
+  (score_1 + score_2 + score_3 + score_4 + score_5) / 5
+
+Then the score is inverted and normalized to a 0-100 communication quality scale:
+
+communicationQualityScore =
+  ((5 - dimensionToxicityScore) / 4) * 100
+
+The result is clamped to the range 0-100 and rounded to the nearest integer.
+
+
+Scale Interpretation
+--------------------
+dimensionToxicityScore = 1 -> communicationQualityScore = 100
+dimensionToxicityScore = 2 -> communicationQualityScore = 75
+dimensionToxicityScore = 3 -> communicationQualityScore = 50
+dimensionToxicityScore = 4 -> communicationQualityScore = 25
+dimensionToxicityScore = 5 -> communicationQualityScore = 0
+
+Interpretation:
+
+81-100 = strong / highly constructive communication
+61-80  = generally respectful communication
+41-60  = mixed communication quality
+21-40  = high-risk communication
+0-20   = critical communication quality
+
+
+Time-Level Formula
+------------------
+The graph groups emails over time.
+
+For each time period, the graph computes the average of all email-level communication quality scores:
+
+periodCommunicationQuality =
+  (qualityEmail_1 + qualityEmail_2 + ... + qualityEmail_n) / n
+
+Example:
+
+If January contains 13 emails and their quality scores are:
+100, 100, 95, 90, ...
+
+then January is the average of those 13 values.
+
+
+Time Buckets
+------------
+The graph automatically chooses the grouping:
+
+- Daily buckets for short histories up to about 45 days.
+- Monthly buckets for longer histories.
+
+This keeps the trend readable while still preserving change over time.
+
+
+Why Overall Toxicity Is Not Used In This Trend Score
+----------------------------------------------------
+The graph does not combine Overall Toxicity with the dimension average.
+
+Reason:
+Overall Toxicity is usually derived from, or strongly related to, the dimension scores.
+Combining it again with the dimension average can double-count the same information.
+
+For a cleaner statistical trend, the graph uses the mean of the five dimension scores only.
+
+
+Why Overall Flag Is Not Used In This Trend Score
+------------------------------------------------
+Overall Flag is not subtracted from the quality score.
+
+Reason:
+The flag is a threshold-based indicator, while the graph is a continuous severity trend.
+Mixing a threshold penalty into the score would make the metric harder to interpret
+statistically.
+
+Overall Flag can still be analyzed separately as a rate:
+
+flagRate =
+  flaggedEmails / totalEmails * 100
+
+
+Difference From Positive Rate
+-----------------------------
+A positive-rate graph would use:
+
+positiveRate =
+  positiveEmails / totalEmails * 100
+
+That is easier to explain but less informative for scientific trend analysis.
+It treats a slightly problematic email and a highly problematic email too similarly.
+
+The Communication Quality Score keeps severity information, which makes trend changes
+more meaningful.

@@ -1,0 +1,63 @@
+{
+  "name": "toxicradar-desktop",
+  "version": "1.0.1",
+  "description": "Electron desktop app for message analysis, live warning, rewrites, and Excel-based reporting.",
+  "author": "ToxicRadar",
+  "main": "main.js",
+  "scripts": {
+    "start": "node server.js",
+    "web": "node server.js",
+    "desktop": "electron .",
+    "pack": "electron-builder --dir",
+    "build:win": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.toxicradar.desktop",
+    "productName": "ToxicRadar",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "**/*",
+      "!release/**",
+      "!__pycache__/**",
+      "!.env",
+      "!.env.*",
+      "!*.xlsx",
+      "!*.xls",
+      "!*.csv",
+      "!*.log",
+      "!*.backup*",
+      "!package-lock.json",
+      "!node_modules/.cache/**"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ToxicRadar"
+    }
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "electron-store": "^8.2.0",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "node-fetch": "^2.7.0",
+    "pst-extractor": "^1.11.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.8.1"
+  }
+}
