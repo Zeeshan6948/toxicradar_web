@@ -48,23 +48,11 @@
       });
     },
 
-    // API Usage Tracking
-    async getUsage() {
-      return request("/api/usage");
-    },
-
-    async recordUsage(model, usage) {
-      return request("/api/usage", {
-        method: "POST",
-        body: JSON.stringify({ model, usage }),
-      });
-    },
-
     // AI Analysis
-    async analyze(text, apiKey = "") {
+    async analyze(text, biometrics = null) {
       return request("/api/analyze", {
         method: "POST",
-        body: JSON.stringify({ text, apiKey }),
+        body: JSON.stringify({ text, biometrics }),
       });
     },
 
@@ -136,6 +124,15 @@
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     },
+
+    // Biometrics
+    async pairWatch() {
+      return request("/api/biometrics/pair", { method: "POST" });
+    },
+
+    async getBiometrics(sessionId) {
+      return request(`/api/biometrics/current?sessionId=${encodeURIComponent(sessionId)}`);
+    }
   };
 
   window.apiClient = apiClient;

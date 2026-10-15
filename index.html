@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ToxicRadar</title>
     <link rel="stylesheet" href="style.css" />
+    <script>
+      (function () {
+        const savedTheme = localStorage.getItem("toxicradar_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", savedTheme);
+      })();
+    </script>
   </head>
   <body>
     <div class="app-shell">
@@ -24,19 +30,6 @@
           <button class="nav-btn" data-view="reports" data-period="all">Total History</button>
         </nav>
 
-        <div class="sidebar-actions">
-          <div class="excel-tools">
-            <button id="open-excel-btn" class="ghost-btn excel-btn">
-              <img
-                src="Microsoft_Excel-Logo.wine.svg"
-                alt="Excel"
-                class="excel-btn-icon"
-              />
-              <span>Open Excel</span>
-            </button>
-            <button id="choose-excel-btn" type="button" class="ghost-btn choose-excel-btn">Choose Excel File</button>
-          </div>
-        </div>
       </aside>
 
       <main class="workspace">
@@ -448,46 +441,34 @@
     </div>
 
     <div id="settings-modal" class="modal hidden">
-      <div class="modal-backdrop"></div>
+      <div class="modal-backdrop" data-close-modal="settings-modal"></div>
       <div class="modal-panel narrow">
         <div class="modal-header">
           <div>
             <p class="eyebrow">Application Settings</p>
-            <h3>OpenAI API Key</h3>
+            <h3>Preferences</h3>
           </div>
           <button class="modal-close-btn" type="button" data-close-modal="settings-modal" aria-label="Close settings">
             &times;
           </button>
         </div>
 
-        <p class="muted">
-          Enter your OpenAI API key to enable message analysis. You can update this later from the
-          sidebar.
-        </p>
-
-        <label class="field full-width">
-          <span>OpenAI API Key</span>
-          <input id="api-key-input" type="password" placeholder="sk-..." />
-        </label>
-
-        <label class="field full-width">
-          <span>Usage Reminder</span>
-          <select id="reminder-interval-select">
-            <option value="0">Off</option>
-            <option value="7">Every 7 days</option>
-            <option value="14">Every 14 days</option>
-            <option value="30">Every 30 days</option>
-          </select>
-          <button id="test-reminder-btn" class="ghost-btn settings-save-btn" type="button">Send Test Reminder</button>
-        </label>
-
-        <div class="settings-usage-card">
-          <span class="stat-label">API Usage this month</span>
-          <strong id="api-usage-summary">~0 tokens ($0.00 estimated)</strong>
+        <div class="settings-content" style="display: grid; gap: 20px; margin-top: 10px;">
+          <label class="field full-width">
+            <span>Appearance & Theme</span>
+            <div class="theme-switch-wrap">
+              <button type="button" id="theme-btn-dark" class="theme-toggle-btn active" data-theme="dark">
+                <span class="theme-icon">🌙</span> Dark Mode
+              </button>
+              <button type="button" id="theme-btn-light" class="theme-toggle-btn" data-theme="light">
+                <span class="theme-icon">☀️</span> Light Mode
+              </button>
+            </div>
+          </label>
         </div>
 
-        <div class="modal-actions">
-          <button id="save-settings-btn" class="accent-btn settings-save-btn">Save Settings</button>
+        <div class="modal-actions" style="margin-top: 24px; display: flex; justify-content: flex-end;">
+          <button type="button" class="accent-btn" data-close-modal="settings-modal">Done</button>
         </div>
 
         <p id="settings-feedback" class="muted"></p>

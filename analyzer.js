@@ -550,7 +550,12 @@ function normalizeAnalysisPayload(parsed) {
   };
 }
 
-async function requestAnalysisOnce(emailText, openaiApiKey) {
+async function requestAnalysisOnce(emailText, openaiApiKey, biometrics = null) {
+  let instructions = ELTC_SYSTEM_PROMPT;
+  if (biometrics && biometrics.stressLevel) {
+    instructions += `\n\n[BIOMETRICS CONTEXT]\nThe author's current stress level based on Apple Watch biometrics is: ${biometrics.stressLevel.toUpperCase()} (Heart Rate: ${biometrics.bpm} BPM).\nIf the stress level is elevated or high, consider that the author might be unintentionally projecting frustration, exerting pressure, or undermining development due to their emotional state. Highlight this in the notes if relevant.`;
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -560,7 +565,7 @@ async function requestAnalysisOnce(emailText, openaiApiKey) {
     body: JSON.stringify({
       model: OPENAI_ANALYSIS_MODEL,
       temperature: 0,
-      instructions: ELTC_SYSTEM_PROMPT,
+      instructions: instructions,
       input: `Please analyze this email:\n\n${emailText}`,
       text: {
         format: {
@@ -587,19 +592,20 @@ async function requestAnalysisOnce(emailText, openaiApiKey) {
   const parsed = JSON.parse(clean);
   return {
     ...normalizeAnalysisPayload(parsed),
+    biometrics: biometrics || null,
     usage: data?.usage || null,
     model: data?.model || OPENAI_ANALYSIS_MODEL,
   };
 }
 
-async function analyzeEmailText(emailText, openaiApiKey) {
+async function analyzeEmailText(emailText, openaiApiKey, biometrics = null) {
   const maxRetries = 3;
   let lastError = null;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
       await delay(200);
-      return await requestAnalysisOnce(emailText, openaiApiKey);
+      return await requestAnalysisOnce(emailText, openaiApiKey, biometrics);
     } catch (error) {
       lastError = error;
       if (attempt < maxRetries) {

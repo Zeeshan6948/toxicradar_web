@@ -1,3 +1,4 @@
+
 const XLSX = require("xlsx");
 
 function ensureWorkbook(targetPath) {
@@ -422,7 +423,14 @@ function toNumber(value) {
 
 function readDashboardSummary(targetPath) {
   const workbook = ensureWorkbook(targetPath);
-  const rows = readSheetRows(workbook, "Auswertung");
+  return summarizeRows(readSheetRows(workbook, "Auswertung"));
+}
+
+/**
+ * Aggregate header-keyed rows (the "Auswertung" sheet shape) into the dashboard summary.
+ * Used for both Excel files and rows derived from Firebase records.
+ */
+function summarizeRows(rows) {
   if (!rows.length) {
     return {
       totalEmails: 0,
@@ -584,9 +592,109 @@ function readDashboardSummary(targetPath) {
   };
 }
 
+/**
+ * Convert one stored record ({ email, analysis, error }) into the header-keyed
+ * "Auswertung" row shape. Works for legacy Firebase compose records as well.
+ */
+function recordToRow(record) {
+  const email = record?.email || {};
+  const analysis = record?.analysis || null;
+  const error = record?.error || null;
+  const dimensions = normalizeDashboardDimensions(analysis?.dimensions || []);
+  const scoreFor = (name) => dimensions.find((dimension) => dimension.name === name)?.score || 1;
+  const rawDate = email.date || record?.createdAt || "";
+
+  return {
+    Subject: email.subject || "",
+    "Original Text": email.textForAnalysis || email.body || "",
+    "Rewritten Text": analysis?.suggestedRewrite || "",
+    Date: toExcelDate(rawDate) || String(rawDate || ""),
+    "Overall Toxicity": error ? "" : analysis?.overallToxicityScore || "",
+    Level: error ? "" : analysis?.overallToxicityLabel || "",
+    "Overall Flag": error ? "Error" : analysis?.overallFlag ? "True" : "False",
+    Notes: error ? String(error) : analysis?.notes || "",
+    "Genuine Egoistic Behaviors": scoreFor("Genuine Egoistic Behaviors"),
+    "Taking Credit": scoreFor("Taking Credit"),
+    "Exerting Pressure": scoreFor("Exerting Pressure"),
+    "Undermining Development": scoreFor("Undermining Development"),
+    Manipulating: scoreFor("Manipulating"),
+    Sender: email.sender || "",
+    Recipients: email.recipients || "",
+    "Record JSON": JSON.stringify({
+      email,
+      analysis: analysis ? { ...analysis, dimensions } : null,
+      error,
+    }),
+  };
+}
+
+function summarizeRecords(records) {
+  return summarizeRows((records || []).map(recordToRow));
+}
+
+/**
+ * Parse an uploaded Excel log into storable records ({ email, analysis, error }).
+ * Prefers the embedded "Record JSON" column, and falls back to the visible
+ * columns so older / hand-edited sheets keep working.
+ */
+function parseExcelRecords(targetPath) {
+  const workbook = XLSX.readFile(targetPath);
+  const rows = readSheetRows(workbook, "Auswertung");
+  const records = [];
+
+  for (const row of rows) {
+    const saved = safeParseJson(row["Record JSON"]);
+    const subject = String(row.Subject || saved?.email?.subject || "").trim();
+    const text = String(row["Original Text"] || saved?.email?.textForAnalysis || saved?.email?.body || "").trim();
+    if (!subject && !text && !saved) continue;
+
+    const columnDimensions = {
+      genuineEgoisticBehaviors: toNumber(row["Genuine Egoistic Behaviors"]) ?? 1,
+      takingCredit: toNumber(row["Taking Credit"]) ?? 1,
+      exertingPressure: toNumber(row["Exerting Pressure"]) ?? 1,
+      underminingDevelopment: toNumber(row["Undermining Development"]) ?? 1,
+      manipulating: toNumber(row["Manipulating"]) ?? 1,
+    };
+    const dimensions = normalizeDashboardDimensions(saved?.analysis?.dimensions || [], columnDimensions);
+    const overallScore = toNumber(row["Overall Toxicity"]);
+    const flagText = String(row["Overall Flag"] || "").trim().toLowerCase();
+    const error = saved?.error || (flagText === "error" ? String(row.Notes || "Error") : null);
+
+    records.push({
+      email: {
+        subject,
+        recipients: String(row.Recipients || saved?.email?.recipients || ""),
+        sender: String(row.Sender || saved?.email?.sender || ""),
+        date: String(saved?.email?.date || row.Date || ""),
+        body: String(saved?.email?.body || text),
+        textForAnalysis: text,
+      },
+      analysis: error
+        ? null
+        : {
+            ...(saved?.analysis || {}),
+            overallFlag: saved?.analysis?.overallFlag ?? toBooleanFlag(row["Overall Flag"]),
+            overallToxicityScore: saved?.analysis?.overallToxicityScore ?? overallScore ?? "",
+            overallToxicityLabel: saved?.analysis?.overallToxicityLabel || String(row.Level || ""),
+            dimensions,
+            notes: saved?.analysis?.notes ?? String(row.Notes || ""),
+            suggestedRewrite: saved?.analysis?.suggestedRewrite || String(row["Rewritten Text"] || ""),
+          },
+      error,
+    });
+  }
+
+  return records;
+}
+
 module.exports = {
   appendComposeResult,
   exportResults,
   readDashboardSummary,
   updateComposeRewrite,
+  summarizeRows,
+  summarizeRecords,
+  recordToRow,
+  parseExcelRecords,
 };
+

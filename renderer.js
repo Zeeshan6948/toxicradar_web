@@ -5,6 +5,26 @@ const { ipcRenderer } = isElectron ? require("electron") : { ipcRenderer: null }
 const analyzer = isElectron ? require("./analyzer") : null;
 const exporter = isElectron ? require("./exporter") : null;
 
+function filterEmailsByPeriod(emails, filters = {}) {
+  const period = String(filters.period || "all");
+  const now = new Date();
+  return (emails || []).filter((email) => {
+    if (period === "all") return true;
+    if (!email.date) return false;
+    const emailDate = new Date(email.date);
+    if (period === "today") {
+      return (
+        emailDate.getFullYear() === now.getFullYear() &&
+        emailDate.getMonth() === now.getMonth() &&
+        emailDate.getDate() === now.getDate()
+      );
+    }
+    const days = Number(period);
+    if (!Number.isFinite(days) || days <= 0) return false;
+    return (now.getTime() - emailDate.getTime()) / (1000 * 60 * 60 * 24) <= days;
+  });
+}
+
 const LIVE_WARNING_MIN_CHARS = 50;
 const LIVE_WARNING_DEBOUNCE_MS = 1500;
 const LIVE_WARNING_COOLDOWN_MS = 8000;
@@ -157,6 +177,11 @@ function cacheDom() {
   elements.composeBody = document.getElementById("compose-body");
   elements.composeHighlightOverlay = document.getElementById("compose-highlight-overlay");
   elements.composeSendBtn = document.getElementById("compose-send-btn");
+  elements.connectWatchBtn = document.getElementById("connect-watch-btn");
+  elements.watchPairingCode = document.getElementById("watch-pairing-code");
+  elements.biometricBadge = document.getElementById("biometric-badge");
+  elements.bpmValue = document.getElementById("bpm-value");
+  elements.stressLevelLabel = document.getElementById("stress-level-label");
   elements.composeUndoRewriteBtn = document.getElementById("compose-undo-rewrite-btn");
   elements.composeStatus = document.getElementById("compose-status");
   elements.liveWarningToggle = document.getElementById("live-warning-toggle");
@@ -242,60 +267,37 @@ function cacheDom() {
   elements.modalNotes = document.getElementById("modal-notes");
   elements.modalRewriteSection = document.getElementById("modal-rewrite-section");
   elements.modalRewrite = document.getElementById("modal-rewrite");
-  elements.apiKeyInput = document.getElementById("api-key-input");
-  elements.reminderIntervalSelect = document.getElementById("reminder-interval-select");
-  elements.apiUsageSummary = document.getElementById("api-usage-summary");
-  elements.testReminderBtn = document.getElementById("test-reminder-btn");
-  elements.saveSettingsBtn = document.getElementById("save-settings-btn");
+  elements.themeBtnDark = document.getElementById("theme-btn-dark");
+  elements.themeBtnLight = document.getElementById("theme-btn-light");
   elements.settingsFeedback = document.getElementById("settings-feedback");
   elements.summaryMetricTooltip = document.createElement("div");
   elements.summaryMetricTooltip.className = "summary-metric-tooltip";
   document.body.appendChild(elements.summaryMetricTooltip);
 }
 
-function formatTokenCount(value) {
-  return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(Number(value) || 0)));
+function getSavedTheme() {
+  return localStorage.getItem("toxicradar_theme") || "dark";
 }
 
-function formatEstimatedCost(value) {
-  const cost = Number(value) || 0;
-  if (cost > 0 && cost < 0.01) {
-    return "< $0.01";
-  }
-
-  return `$${cost.toFixed(2)}`;
-}
-
-function renderApiUsage(usage = {}) {
-  const totalTokens = Number(usage.totalTokens) || 0;
-  const estimatedCost = Number(usage.estimatedCostUsd) || 0;
-  elements.apiUsageSummary.textContent =
-    `~${formatTokenCount(totalTokens)} tokens (${formatEstimatedCost(estimatedCost)} estimated)`;
-}
-
-async function refreshApiUsage() {
+function applyTheme(theme) {
+  const chosenTheme = theme === "light" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", chosenTheme);
   try {
-    const usage = isElectron
-      ? await ipcRenderer.invoke("api-usage:get")
-      : await window.apiClient.getUsage();
-    renderApiUsage(usage);
-  } catch (_error) {
-    renderApiUsage();
-  }
-}
+    localStorage.setItem("toxicradar_theme", chosenTheme);
+  } catch (_e) {}
 
-async function recordApiUsageFromAnalysis(analysis) {
-  if (!analysis?.usage) {
-    return;
+  if (elements.themeBtnDark && elements.themeBtnLight) {
+    if (chosenTheme === "dark") {
+      elements.themeBtnDark.classList.add("active");
+      elements.themeBtnLight.classList.remove("active");
+    } else {
+      elements.themeBtnLight.classList.add("active");
+      elements.themeBtnDark.classList.remove("active");
+    }
   }
 
-  try {
-    const model = analysis.model || analyzer?.OPENAI_ANALYSIS_MODEL || "gpt-4o-mini";
-    const usage = isElectron
-      ? await ipcRenderer.invoke("api-usage:record", { model, usage: analysis.usage })
-      : await window.apiClient.recordUsage(model, analysis.usage);
-    renderApiUsage(usage);
-  } catch (_error) {
+  if (state.activeView === "reports" && typeof updateReportDashboard === "function") {
+    updateReportDashboard();
   }
 }
 
@@ -2463,6 +2465,9 @@ async function refreshDashboardInsightsFromExcel() {
     updateDashboardInsights();
   } else {
     try {
+      if (!state.dashboardSummary) {
+        setComposeStatus("Loading data from Firebase...");
+      }
       const summary = await window.apiClient.getExcelSummary();
       state.dashboardSummary = summary;
       if (summary?.excelPath) {
@@ -2470,7 +2475,8 @@ async function refreshDashboardInsightsFromExcel() {
       }
       updateDashboardInsights();
     } catch (err) {
-      console.error("Failed to load Excel summary:", err);
+      console.error("Failed to load data from Firebase:", err);
+      setComposeStatus(err.message || "Could not load data from Firebase.");
     }
   }
 }
@@ -2849,7 +2855,9 @@ function refreshFilters() {
     return;
   }
 
-  state.filteredEmails = analyzer.applyFilters(state.pstData.emails, getFilters());
+  state.filteredEmails = isElectron
+    ? analyzer.applyFilters(state.pstData.emails, getFilters())
+    : filterEmailsByPeriod(state.pstData.emails, getFilters());
   elements.emailCount.textContent = `${state.pstData.totalEmails} emails found in Sent Items. ${state.filteredEmails.length} currently match the filters.`;
   if (!state.results.length) {
     renderEmptyTable(state.filteredEmails.length ? "No results yet." : "No emails match the current filters.");
@@ -2874,23 +2882,16 @@ function handleFilterChange() {
 }
 
 async function loadSettings() {
-  const settings = isElectron
-    ? await ipcRenderer.invoke("settings:get")
-    : await window.apiClient.getSettings();
-  state.openaiApiKey = String(settings?.openaiApiKey || "");
-  state.composeLogPath = String(settings?.excelPath || "");
-  elements.apiKeyInput.value = state.openaiApiKey;
-  elements.reminderIntervalSelect.value = String(settings?.reminderIntervalDays || 0);
-
-  if (isElectron) {
-    renderApiUsage(settings?.apiUsage);
-  } else {
-    refreshApiUsage();
-  }
-
-  if (!state.openaiApiKey) {
-    elements.settingsFeedback.textContent = "An API key is required before you can run analyses.";
-    setComposeStatus("You can draft a message now. Save an OpenAI API key in Settings before analyzing.");
+  applyTheme(getSavedTheme());
+  try {
+    const settings = isElectron
+      ? await ipcRenderer.invoke("settings:get")
+      : await window.apiClient.getSettings();
+    if (isElectron) {
+      state.composeLogPath = String(settings?.excelPath || "");
+    }
+  } catch (err) {
+    console.warn("Failed to load settings:", err);
   }
 }
 
@@ -2916,59 +2917,10 @@ function closeModal(id) {
 }
 
 async function saveSettings() {
-  const openaiApiKey = elements.apiKeyInput.value.trim();
-  const reminderIntervalDays = Number(elements.reminderIntervalSelect.value || 0);
-
-  if (isElectron) {
-    await ipcRenderer.invoke("settings:set", { openaiApiKey, reminderIntervalDays });
-  } else {
-    await window.apiClient.saveSettings({ openaiApiKey, reminderIntervalDays });
-  }
-
-  state.openaiApiKey = openaiApiKey;
-  elements.settingsFeedback.textContent = openaiApiKey
-    ? "Settings saved successfully."
-    : "API key cleared. Batch analysis will remain unavailable.";
-
-  if (openaiApiKey) {
-    closeModal("settings-modal");
-  }
-}
-
-async function sendTestReminder() {
-  if (isElectron) {
-    const result = await ipcRenderer.invoke("reminder:test");
-    elements.settingsFeedback.textContent = result?.success
-      ? "Test reminder sent."
-      : "Windows notifications are not available on this system.";
-  } else {
-    if (!("Notification" in window)) {
-      elements.settingsFeedback.textContent = "Web notifications are not supported in this browser.";
-      return;
-    }
-    let perm = Notification.permission;
-    if (perm !== "granted") {
-      perm = await Notification.requestPermission();
-    }
-    if (perm === "granted") {
-      new Notification("ToxicRadar Reminder", {
-        body: "Reminder: Review communication tone and sentiment.",
-        icon: "Microsoft_Excel-Logo.wine.svg",
-      });
-      elements.settingsFeedback.textContent = "Browser test reminder sent!";
-    } else {
-      elements.settingsFeedback.textContent = "Browser notification permission denied.";
-    }
-  }
+  closeModal("settings-modal");
 }
 
 async function analyzeComposeMessage() {
-  if (!state.openaiApiKey) {
-    elements.settingsFeedback.textContent = "Please save an OpenAI API key before starting.";
-    openModal("settings-modal");
-    return;
-  }
-
   const email = buildComposeEmailRecord();
   if (!email.body) {
     setComposeStatus("Please write a message before starting the analysis.");
@@ -2988,11 +2940,11 @@ async function analyzeComposeMessage() {
     if (isElectron) {
       analysis = await analyzer.analyzeEmailText(email.textForAnalysis, state.openaiApiKey);
     } else {
-      const res = await window.apiClient.analyze(email.textForAnalysis, state.openaiApiKey);
+      const biometricsData = watchConnected ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
+      const res = await window.apiClient.analyze(email.textForAnalysis, biometricsData);
       analysis = res.analysis;
     }
     state.composeResult = { email, analysis, error: null };
-    await recordApiUsageFromAnalysis(analysis);
   } catch (error) {
     state.composeResult = createErrorResult(email, error);
   }
@@ -3039,14 +2991,6 @@ async function runLiveWarningAnalysis(_snapshotText) {
     return;
   }
 
-  if (!state.openaiApiKey) {
-    state.isLiveAnalyzing = false;
-    hideLiveWarning();
-    setComposeStatus("Save an OpenAI API key in Settings before using Live Warning.");
-    setControls();
-    return;
-  }
-
   const requestId = ++liveAnalysisRequestId;
   state.isLiveAnalyzing = true;
   setControls();
@@ -3057,10 +3001,10 @@ async function runLiveWarningAnalysis(_snapshotText) {
     if (isElectron) {
       analysis = await analyzer.analyzeEmailText(snapshotText, state.openaiApiKey);
     } else {
-      const res = await window.apiClient.analyze(snapshotText, state.openaiApiKey);
+      const biometricsData = watchConnected ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
+      const res = await window.apiClient.analyze(snapshotText, biometricsData);
       analysis = res.analysis;
     }
-    await recordApiUsageFromAnalysis(analysis);
 
     if (requestId !== liveAnalysisRequestId || !state.liveWarningEnabled) {
       return;
@@ -3324,12 +3268,6 @@ function createErrorResult(email, error) {
 }
 
 async function runBatchAnalysis() {
-  if (!state.openaiApiKey) {
-    elements.settingsFeedback.textContent = "Please save an OpenAI API key before starting.";
-    openModal("settings-modal");
-    return;
-  }
-
   if (!state.filteredEmails.length) {
     setStatus("No emails match the selected filters.");
     return;
@@ -3354,8 +3292,13 @@ async function runBatchAnalysis() {
     setStatus(`Analyzing "${email.subject}" (${index + 1} of ${state.filteredEmails.length})...`);
 
     try {
-      const analysis = await analyzer.analyzeEmailText(email.textForAnalysis, state.openaiApiKey);
-      await recordApiUsageFromAnalysis(analysis);
+      let analysis;
+      if (isElectron) {
+        analysis = await analyzer.analyzeEmailText(email.textForAnalysis, state.openaiApiKey);
+      } else {
+        const res = await window.apiClient.analyze(email.textForAnalysis);
+        analysis = res.analysis;
+      }
       state.results.push({ email, analysis, error: null });
     } catch (error) {
       state.results.push(createErrorResult(email, error));
@@ -3510,6 +3453,82 @@ function openSummaryDetails(index) {
   openDetails(row.detailItem || buildDetailItemFromSummary(row));
 }
 
+// Biometrics State & Polling
+let watchSessionId = null;
+let watchPollInterval = null;
+let currentStressLevel = "calm";
+let currentBpm = null;
+let watchConnected = false;
+
+async function startWatchPairing() {
+  try {
+    elements.connectWatchBtn.disabled = true;
+    elements.connectWatchBtn.textContent = "Pairing...";
+    
+    const res = await window.apiClient.pairWatch();
+    watchSessionId = res.sessionId;
+    elements.watchPairingCode.textContent = res.pairCode;
+    elements.watchPairingCode.classList.remove("hidden");
+    elements.connectWatchBtn.classList.add("hidden");
+
+    // Start polling for connection
+    if (watchPollInterval) clearInterval(watchPollInterval);
+    watchPollInterval = setInterval(pollBiometrics, 2000);
+  } catch (err) {
+    console.error("Pairing error:", err);
+    elements.connectWatchBtn.disabled = false;
+    elements.connectWatchBtn.textContent = "Connect Watch";
+  }
+}
+
+async function pollBiometrics() {
+  if (!watchSessionId) return;
+  
+  try {
+    const data = await window.apiClient.getBiometrics(watchSessionId);
+    
+    if (data.status === "paired" && !watchConnected) {
+      watchConnected = true;
+      elements.watchPairingCode.classList.add("hidden");
+      elements.biometricBadge.classList.remove("hidden");
+    }
+    
+    if (watchConnected && data.status === "paired") {
+      updateBiometricUI(data);
+    }
+  } catch (err) {
+    console.error("Polling error:", err);
+  }
+}
+
+function updateBiometricUI(data) {
+  if (data.bpm) {
+    currentBpm = Math.round(data.bpm);
+    elements.bpmValue.textContent = `${currentBpm} BPM`;
+  }
+  
+  if (typeof data.stressScore === "number") {
+    let level = "Calm";
+    let color = "var(--success)"; // green
+    currentStressLevel = "calm";
+    
+    if (data.stressScore > 75) {
+      level = "High Stress";
+      color = "var(--error)"; // red
+      currentStressLevel = "high";
+    } else if (data.stressScore > 50) {
+      level = "Elevated";
+      color = "var(--warning)"; // yellow
+      currentStressLevel = "elevated";
+    }
+    
+    elements.stressLevelLabel.textContent = level;
+    elements.stressLevelLabel.style.color = color;
+    elements.bpmValue.style.color = color;
+  }
+}
+
+
 function bindEvents() {
   for (const button of elements.navButtons) {
     button.addEventListener("click", () => {
@@ -3520,8 +3539,12 @@ function bindEvents() {
     });
   }
 
-  elements.openExcelBtn.addEventListener("click", openExcelLog);
-  elements.chooseExcelBtn.addEventListener("click", chooseExcelLogPath);
+  elements.openExcelBtn?.addEventListener("click", openExcelLog);
+  elements.chooseExcelBtn?.addEventListener("click", chooseExcelLogPath);
+  
+  if (elements.connectWatchBtn) {
+    elements.connectWatchBtn.addEventListener("click", startWatchPairing);
+  }
   elements.negativeSummary.addEventListener("click", () => setSummaryFilter("negative"));
   elements.neutralSummary.addEventListener("click", () => setSummaryFilter("neutral"));
   elements.positiveSummary.addEventListener("click", () => setSummaryFilter("positive"));
@@ -3548,11 +3571,15 @@ function bindEvents() {
   elements.exportOutlookBtn.addEventListener("click", exportPstFromOutlook);
   elements.settingsBtn.addEventListener("click", () => {
     elements.settingsFeedback.textContent = "";
-    refreshApiUsage();
+    applyTheme(getSavedTheme());
     openModal("settings-modal");
   });
-  elements.testReminderBtn.addEventListener("click", sendTestReminder);
-  elements.saveSettingsBtn.addEventListener("click", saveSettings);
+  if (elements.themeBtnDark) {
+    elements.themeBtnDark.addEventListener("click", () => applyTheme("dark"));
+  }
+  if (elements.themeBtnLight) {
+    elements.themeBtnLight.addEventListener("click", () => applyTheme("light"));
+  }
   elements.periodSelect.addEventListener("change", handleFilterChange);
   elements.reportMetricSelect.addEventListener("change", () => {
     state.reportChart.metric = elements.reportMetricSelect.value;
@@ -3725,7 +3752,7 @@ function bindEvents() {
             state.composeLogPath = res.excelPath;
           }
           updateDashboardInsights();
-          setComposeStatus(`Excel file ${file.name} uploaded and loaded successfully.`);
+          setComposeStatus(`${file.name}: ${res.imported ?? ""} emails saved to Firebase and loaded.`);
         }
       } catch (err) {
         setComposeStatus(`Failed to upload Excel: ${err.message}`);

@@ -2,235 +2,142 @@ try {
   require("dotenv").config();
 } catch (_e) {}
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const express = require("express");
-const cors = require("cors");
+const security = require("./security");
 const multer = require("multer");
 const analyzer = require("./analyzer");
 const exporter = require("./exporter");
+const biometrics = require("./biometrics");
+const firebase = require("./firebase");
+const store = require("./store");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const DATA_DIR = path.join(__dirname, "data");
-const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
-const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
-const DEFAULT_EXCEL_PATH = path.join(DATA_DIR, "ToxicRadar-Compose-Log.xlsx");
+// Only transient files (in-flight uploads / generated downloads) touch disk, in the OS temp
+// folder, and each is deleted right after use. All persistent data lives in Firebase.
+const UPLOADS_DIR = path.join(os.tmpdir(), "toxicradar-tmp");
+const STORAGE_LABEL = "Firebase Cloud Storage";
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// Ensure data and uploads directories exist
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// Uploads: restrict file type and size
+function uploaderFor(allowedExtensions, maxBytes) {
+  return multer({
+    dest: UPLOADS_DIR,
+    limits: { fileSize: maxBytes, files: 1 },
+    fileFilter: (req, file, cb) => {
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      cb(null, allowedExtensions.includes(ext));
+    },
+  });
 }
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+const uploadExcel = uploaderFor([".xlsx", ".xls"], 25 * 1024 * 1024);
+const uploadPst = uploaderFor([".pst"], 100 * 1024 * 1024);
 
-// Check for existing sample or default Excel log
-function resolveDefaultExcelPath() {
-  const localDefault = path.join(DATA_DIR, "ToxicRadar-Compose-Log.xlsx");
-  if (fs.existsSync(localDefault)) return localDefault;
+// ==================== SECURITY MIDDLEWARE ====================
+// Render sits behind a proxy; this makes req.ip the real client address.
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
 
-  const parentFile = path.resolve(__dirname, "..", "ToxicRadar_Auswertung_v2.xlsx");
-  if (fs.existsSync(parentFile)) return parentFile;
-
-  return localDefault;
-}
-
-// In-file settings manager replacing electron-store
-function loadSettings() {
-  const envKey = process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.trim() : "";
-  const defaults = {
-    openaiApiKey: envKey,
-    excelPath: resolveDefaultExcelPath(),
-    apiUsageByMonth: {},
-    reminderIntervalDays: 0,
-    lastReminderAt: "",
-  };
-
-  try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
-      const merged = { ...defaults, ...parsed };
-      if (!merged.openaiApiKey && envKey) {
-        merged.openaiApiKey = envKey;
-      }
-      return merged;
-    }
-  } catch (err) {
-    console.error("Failed to read settings file, using defaults:", err.message);
-  }
-
-  return defaults;
+const APP_PASSWORD = String(process.env.APP_PASSWORD || "");
+const IS_HOSTED = process.env.RENDER === "true" || process.env.NODE_ENV === "production";
+if (IS_HOSTED && !APP_PASSWORD) {
+  console.error("!! APP_PASSWORD is not set. The site will refuse all requests until it is.");
 }
 
-function saveSettings(settings) {
-  try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf8");
-    return true;
-  } catch (err) {
-    console.error("Failed to save settings:", err.message);
-    return false;
-  }
-}
-
-let currentSettings = loadSettings();
-
-// Usage & Pricing Logic
-const ANALYSIS_MODEL_PRICING = {
-  "gpt-4o-mini": {
-    inputPerMillion: 0.15,
-    cachedInputPerMillion: 0.075,
-    outputPerMillion: 0.6,
-  },
-};
-
-function getCurrentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function toUsageNumber(value) {
-  const number = Number(value);
-  return Number.isFinite(number) && number > 0 ? Math.round(number) : 0;
-}
-
-function estimateUsageCost(model, usage = {}) {
-  const pricing = ANALYSIS_MODEL_PRICING[model] || ANALYSIS_MODEL_PRICING["gpt-4o-mini"];
-  const inputTokens = toUsageNumber(usage.input_tokens);
-  const outputTokens = toUsageNumber(usage.output_tokens);
-  const cachedInputTokens = Math.min(
-    inputTokens,
-    toUsageNumber(usage.input_tokens_details?.cached_tokens)
-  );
-  const regularInputTokens = Math.max(0, inputTokens - cachedInputTokens);
-
-  return (
-    (regularInputTokens / 1_000_000) * pricing.inputPerMillion +
-    (cachedInputTokens / 1_000_000) * pricing.cachedInputPerMillion +
-    (outputTokens / 1_000_000) * pricing.outputPerMillion
-  );
-}
-
-function getCurrentMonthUsage() {
-  const monthKey = getCurrentMonthKey();
-  const usageByMonth = currentSettings.apiUsageByMonth || {};
-  const monthUsage = usageByMonth[monthKey] || {};
-
-  return {
-    monthKey,
-    requests: toUsageNumber(monthUsage.requests),
-    inputTokens: toUsageNumber(monthUsage.inputTokens),
-    outputTokens: toUsageNumber(monthUsage.outputTokens),
-    cachedInputTokens: toUsageNumber(monthUsage.cachedInputTokens),
-    totalTokens: toUsageNumber(monthUsage.totalTokens),
-    estimatedCostUsd: Number(monthUsage.estimatedCostUsd) || 0,
-  };
-}
-
-function recordApiUsage(model, usage = {}) {
-  const monthKey = getCurrentMonthKey();
-  const usageByMonth = currentSettings.apiUsageByMonth || {};
-  const current = usageByMonth[monthKey] || {};
-
-  const inputTokens = toUsageNumber(usage.input_tokens);
-  const outputTokens = toUsageNumber(usage.output_tokens);
-  const cachedInputTokens = Math.min(
-    inputTokens,
-    toUsageNumber(usage.input_tokens_details?.cached_tokens)
-  );
-  const totalTokens = toUsageNumber(usage.total_tokens) || inputTokens + outputTokens;
-  const cost = estimateUsageCost(model, usage);
-
-  usageByMonth[monthKey] = {
-    requests: toUsageNumber(current.requests) + 1,
-    inputTokens: toUsageNumber(current.inputTokens) + inputTokens,
-    outputTokens: toUsageNumber(current.outputTokens) + outputTokens,
-    cachedInputTokens: toUsageNumber(current.cachedInputTokens) + cachedInputTokens,
-    totalTokens: toUsageNumber(current.totalTokens) + totalTokens,
-    estimatedCostUsd: Number(((Number(current.estimatedCostUsd) || 0) + cost).toFixed(6)),
-    updatedAt: new Date().toISOString(),
-  };
-
-  currentSettings.apiUsageByMonth = usageByMonth;
-  saveSettings(currentSettings);
-  return getCurrentMonthUsage();
-}
-
-// Multer Storage Configuration
-const upload = multer({
-  dest: UPLOADS_DIR,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+const authFailLimiter = security.createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Too many failed logins. Try again in 15 minutes.",
+});
+const pairConfirmLimiter = security.createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  message: "Too many pairing attempts. Try again later.",
+});
+const analyzeLimiter = security.createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 600,
+  message: "Analysis limit reached for this hour.",
 });
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(security.securityHeaders);
+app.use(
+  security.createAuthGate({
+    password: APP_PASSWORD,
+    requirePassword: IS_HOSTED,
+    failLimiter: authFailLimiter,
+    // Reachable without the site password. The watch can't show a login box,
+    // so these protect themselves (bearer token / single-use pairing code).
+    openRoutes: [
+      "GET /api/health",
+      "GET /privacy",
+      "POST /api/biometrics",
+      "POST /api/biometrics/pair/confirm",
+    ],
+  })
+);
+app.use(security.sameOriginGuard);
+app.use(express.json({ limit: "10mb" }));
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname)));
+// Serve ONLY the frontend files. Never expose the project root: it contains
+// data/settings.json (API key), server source and uploaded files.
+const PUBLIC_FILES = [
+  "index.html",
+  "style.css",
+  "renderer.js",
+  "api-client.js",
+  "Microsoft_Excel-Logo.wine.svg",
+];
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "index.html")));
+PUBLIC_FILES.forEach((fileName) => {
+  app.get(`/${fileName}`, (req, res) => res.sendFile(path.join(__dirname, fileName)));
+});
+app.use("/assets", express.static(path.join(__dirname, "assets")));
 
 // ==================== REST API ENDPOINTS ====================
 
 // Settings endpoints
+function getActiveKey() {
+  return String(process.env.OPENAI_API_KEY || "").trim();
+}
+
 app.get("/api/settings", (req, res) => {
-  const activeKey = (currentSettings.openaiApiKey || process.env.OPENAI_API_KEY || "").trim();
   res.json({
-    openaiApiKey: activeKey,
-    excelPath: currentSettings.excelPath || DEFAULT_EXCEL_PATH,
-    reminderIntervalDays: Number(currentSettings.reminderIntervalDays) || 0,
-    hasApiKey: Boolean(activeKey),
+    excelPath: STORAGE_LABEL,
+    storage: firebase.isConfigured() ? "firebase" : "memory",
+    firebaseConfigured: firebase.isConfigured(),
+    hasApiKey: Boolean(getActiveKey()),
   });
 });
 
+// Nothing user-editable is stored server-side any more (theme lives in the browser).
 app.post("/api/settings", (req, res) => {
-  const { openaiApiKey, reminderIntervalDays, excelPath } = req.body || {};
-
-  if (typeof openaiApiKey === "string") {
-    currentSettings.openaiApiKey = openaiApiKey.trim();
-  }
-  if (typeof reminderIntervalDays === "number") {
-    currentSettings.reminderIntervalDays = reminderIntervalDays;
-  }
-  if (typeof excelPath === "string" && excelPath.trim()) {
-    currentSettings.excelPath = excelPath.trim();
-  }
-
-  saveSettings(currentSettings);
-  res.json({ success: true, settings: currentSettings });
-});
-
-// Usage endpoints
-app.get("/api/usage", (req, res) => {
-  res.json(getCurrentMonthUsage());
-});
-
-app.post("/api/usage", (req, res) => {
-  const { model, usage } = req.body || {};
-  const updated = recordApiUsage(model, usage);
-  res.json(updated);
+  res.json({ success: true });
 });
 
 // Analysis endpoint
-app.post("/api/analyze", async (req, res) => {
+app.post("/api/analyze", analyzeLimiter, async (req, res) => {
   try {
-    const { text, apiKey } = req.body || {};
-    if (!text || !text.trim()) {
+    const { text, biometrics } = req.body || {};
+    if (typeof text !== "string" || !text.trim()) {
       return res.status(400).json({ error: "Text content is required for analysis." });
     }
+    if (text.length > 30000) {
+      return res.status(400).json({ error: "Text is too long (max 30,000 characters)." });
+    }
 
-    const keyToUse = (apiKey && apiKey.trim()) || currentSettings.openaiApiKey;
+    const keyToUse = getActiveKey();
     if (!keyToUse) {
       return res.status(400).json({
-        error: "OpenAI API Key is missing. Please configure it in settings or provide it.",
+        error: "OpenAI API Key is missing on the server. Please set OPENAI_API_KEY in the environment.",
       });
     }
 
-    const result = await analyzer.analyzeEmailText(text, keyToUse);
-    if (result && result.usage) {
-      recordApiUsage(result.model || "gpt-4o-mini", result.usage);
-    }
-
+    const result = await analyzer.analyzeEmailText(text, keyToUse, biometrics);
     res.json({ success: true, analysis: result });
   } catch (error) {
     console.error("Analysis failed:", error);
@@ -238,136 +145,117 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-// Excel summary & dashboard endpoint
-app.get("/api/excel/summary", (req, res) => {
+// Excel summary & dashboard endpoint - computed from Firebase records
+app.get("/api/excel/summary", async (req, res) => {
   try {
-    const targetExcelPath = currentSettings.excelPath || DEFAULT_EXCEL_PATH;
-
-    if (!fs.existsSync(targetExcelPath)) {
-      return res.json({
-        totalEmails: 0,
-        positivePercent: 0,
-        neutralPercent: 0,
-        negativePercent: 0,
-        emails: [],
-        excelPath: targetExcelPath,
-        exists: false,
-      });
-    }
-
-    const summary = exporter.readDashboardSummary(targetExcelPath);
+    const summary = await store.getSummary({ from: req.query.from, to: req.query.to });
     res.json({
       ...summary,
-      excelPath: targetExcelPath,
-      exists: true,
+      excelPath: STORAGE_LABEL,
+      storage: "firebase",
+      exists: summary.totalEmails > 0,
     });
   } catch (error) {
-    console.error("Failed to read Excel summary:", error);
-    res.status(500).json({ error: error.message || "Failed to read Excel summary" });
+    console.error("Failed to load records from Firebase:", error);
+    res.status(503).json({ error: `Could not load data from Firebase: ${error.message}` });
   }
 });
 
-// Append compose result to Excel
-app.post("/api/excel/append", (req, res) => {
+// Save an analysed email to Firebase
+app.post("/api/excel/append", async (req, res) => {
   try {
-    const { composeResult, options } = req.body || {};
-    if (!composeResult) {
+    const { composeResult } = req.body || {};
+    if (!composeResult || !composeResult.email) {
       return res.status(400).json({ error: "composeResult is required" });
     }
 
-    const targetExcelPath = currentSettings.excelPath || DEFAULT_EXCEL_PATH;
-    const savedLog = exporter.appendComposeResult(composeResult, targetExcelPath, options || {});
-
-    res.json({
-      success: true,
-      rowNumber: savedLog.rowNumber,
-      excelPath: targetExcelPath,
-    });
+    // The record id doubles as the "rowNumber" the client sends back when updating the rewrite.
+    const id = await store.addComposeResult(composeResult);
+    res.json({ success: true, rowNumber: id, excelPath: STORAGE_LABEL });
   } catch (error) {
-    console.error("Failed to append compose result:", error);
-    res.status(500).json({ error: error.message || "Failed to log compose result to Excel" });
+    console.error("Failed to save compose result to Firebase:", error);
+    res.status(500).json({ error: error.message || "Failed to save compose result to Firebase" });
   }
 });
 
-// Update rewrite in Excel
-app.post("/api/excel/rewrite", (req, res) => {
+// Update the saved rewrite of a record in Firebase
+app.post("/api/excel/rewrite", async (req, res) => {
   try {
     const { rowNumber, rewrite } = req.body || {};
-    const targetExcelPath = currentSettings.excelPath || DEFAULT_EXCEL_PATH;
-
-    exporter.updateComposeRewrite(targetExcelPath, rowNumber, rewrite || "");
+    if (rowNumber) {
+      const updated = await store.updateRewrite(String(rowNumber), rewrite || "");
+      if (!updated) {
+        return res.status(404).json({ error: "Record not found in Firebase." });
+      }
+    }
     res.json({ success: true });
   } catch (error) {
-    console.error("Failed to update rewrite:", error);
-    res.status(500).json({ error: error.message || "Failed to update rewrite in Excel" });
+    console.error("Failed to update rewrite in Firebase:", error);
+    res.status(500).json({ error: error.message || "Failed to update rewrite" });
   }
 });
 
-// Download active Excel file
-app.get("/api/excel/download", (req, res) => {
-  const targetExcelPath = currentSettings.excelPath || DEFAULT_EXCEL_PATH;
-
-  if (!fs.existsSync(targetExcelPath)) {
-    // Generate an empty template workbook if it doesn't exist yet
-    exporter.appendComposeResult(
-      {
-        email: { to: "demo@company.com", subject: "Initial Log", body: "Welcome to ToxicRadar." },
-        analysis: {
-          overallFlag: false,
-          overallToxicityScore: 1,
-          overallToxicityLabel: "Minimal",
-          overallToxicityEmoji: "🟢",
-          dimensions: [],
-          notes: "Initial log entry.",
-          suggestedRewrite: "",
-        },
-      },
-      targetExcelPath,
-      { promptType: "compose" }
-    );
-  }
-
-  res.download(targetExcelPath, path.basename(targetExcelPath) || "ToxicRadar-Log.xlsx");
-});
-
-// Upload an Excel file
-app.post("/api/excel/upload", upload.single("file"), (req, res) => {
+// Download all stored records as an Excel file (generated on the fly from Firebase)
+app.get("/api/excel/download", async (req, res) => {
+  let tempPath = null;
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No Excel file uploaded." });
-    }
-
-    const originalName = req.file.originalname || "Uploaded-Log.xlsx";
-    const newPath = path.join(DATA_DIR, originalName);
-
-    // Move uploaded file to DATA_DIR
-    fs.renameSync(req.file.path, newPath);
-
-    currentSettings.excelPath = newPath;
-    saveSettings(currentSettings);
-
-    const summary = exporter.readDashboardSummary(newPath);
-    res.json({
-      success: true,
-      excelPath: newPath,
-      summary,
+    const records = await store.listRecords({ force: true });
+    tempPath = path.join(UPLOADS_DIR, `ToxicRadar-Log-${Date.now()}.xlsx`);
+    exporter.exportResults(records, tempPath);
+    res.download(tempPath, "ToxicRadar-Compose-Log.xlsx", () => {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_e) {}
     });
   } catch (error) {
-    console.error("Failed to upload Excel file:", error);
-    if (req.file && fs.existsSync(req.file.path)) {
+    console.error("Failed to build Excel download:", error);
+    if (tempPath && fs.existsSync(tempPath)) {
       try {
-        fs.unlinkSync(req.file.path);
+        fs.unlinkSync(tempPath);
       } catch (_e) {}
     }
-    res.status(500).json({ error: error.message || "Failed to process Excel upload" });
+    res.status(503).json({ error: `Could not export data from Firebase: ${error.message}` });
+  }
+});
+
+// Upload an Excel file: parse it, commit every row to Firebase, discard the temp file
+app.post("/api/excel/upload", uploadExcel.single("file"), async (req, res) => {
+  const tempPath = req.file && req.file.path;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "Upload a .xlsx or .xls file." });
+    }
+
+    let records;
+    try {
+      records = exporter.parseExcelRecords(tempPath);
+    } catch (parseError) {
+      return res.status(400).json({ error: "That file could not be read as a ToxicRadar Excel log." });
+    }
+    if (!records.length) {
+      return res.status(400).json({ error: "No email rows were found in that Excel file." });
+    }
+
+    const { count, batchId } = await store.addImportedRecords(records, { fileName: req.file.originalname });
+    const summary = await store.getSummary();
+    res.json({ success: true, imported: count, batchId, excelPath: STORAGE_LABEL, summary });
+  } catch (error) {
+    console.error("Failed to import Excel file into Firebase:", error);
+    res.status(500).json({ error: `Failed to save Excel data to Firebase: ${error.message}` });
+  } finally {
+    if (tempPath) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch (_e) {}
+    }
   }
 });
 
 // Upload and parse PST file
-app.post("/api/pst/upload", upload.single("file"), (req, res) => {
+app.post("/api/pst/upload", uploadPst.single("file"), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No PST file uploaded." });
+      return res.status(400).json({ error: "Upload a .pst file." });
     }
 
     const tempFilePath = req.file.path;
@@ -416,16 +304,129 @@ app.post("/api/export", (req, res) => {
   }
 });
 
+// ==================== APPLE WATCH BIOMETRICS ====================
+
+// Browser: start pairing, receive a 6-digit code to type on the watch
+app.post("/api/biometrics/pair", (req, res) => {
+  try {
+    res.json(biometrics.createPairingSession());
+  } catch (error) {
+    res.status(429).json({ error: error.message });
+  }
+});
+
+// Watch: exchange the 6-digit code for an upload token
+app.post("/api/biometrics/pair/confirm", pairConfirmLimiter, (req, res) => {
+  const result = biometrics.confirmPairing(req.body?.code);
+  if (!result) {
+    return res.status(400).json({ error: "Invalid or expired pairing code." });
+  }
+  res.json({ success: true, ...result });
+});
+
+// Watch: upload one biometric sample (Authorization: Bearer <token>)
+app.post("/api/biometrics", (req, res) => {
+  const header = String(req.get("authorization") || "");
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  const session = biometrics.findSessionByToken(token);
+  if (!session) {
+    return res.status(401).json({ error: "Invalid or missing token. Pair the watch again." });
+  }
+
+  try {
+    const sample = biometrics.addSample(session, req.body);
+    res.json({ success: true, sample });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Browser: latest reading for a session
+app.get("/api/biometrics/current", (req, res) => {
+  const session = biometrics.getSession(req.query.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: "Unknown session. Start pairing again." });
+  }
+  res.json(biometrics.getCurrent(session));
+});
+
+// Browser: recent readings for a session
+app.get("/api/biometrics/history", (req, res) => {
+  const session = biometrics.getSession(req.query.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: "Unknown session. Start pairing again." });
+  }
+  res.json({ samples: biometrics.getHistory(session, req.query.limit) });
+});
+
+// Browser: disconnect the watch and delete its stored data
+app.delete("/api/biometrics/session", (req, res) => {
+  const removed = biometrics.removeSession(req.query.sessionId);
+  res.json({ success: removed });
+});
+
+// Privacy policy (required for App Store HealthKit review)
+app.get("/privacy", (req, res) => {
+  res.sendFile(path.join(__dirname, "appstore", "privacy-policy.html"));
+});
+
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", app: "ToxicRadar Web", version: "1.0.1" });
 });
 
+// Startup warm-up for Render spin-ups. Email records are read straight from
+// Firebase on demand (store.js), so only biometrics sessions need rehydrating.
+async function rehydrateFromFirebase() {
+  if (!firebase.isConfigured()) return;
+  console.log("[Firebase] Starting data rehydration...");
+
+  try {
+    const records = await store.listRecords({ force: true });
+    console.log(`[Firebase] ${records.length} email records available.`);
+  } catch (err) {
+    console.warn("[Firebase] Could not read email records:", err.message);
+  }
+
+  try {
+    const remoteSessions = await firebase.getBiometricsSessions();
+    if (remoteSessions && remoteSessions.length > 0) {
+      const count = biometrics.rehydrateSessions(remoteSessions);
+      console.log(`[Firebase] Rehydrated ${count} active biometrics sessions.`);
+    }
+  } catch (err) {
+    console.warn("[Firebase] Biometrics sessions rehydration failed:", err.message);
+  }
+}
+
 // Start Server
-app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`=============================================`);
   console.log(`🚀 ToxicRadar Web running at: http://localhost:${PORT}`);
-  console.log(`📁 Data directory: ${DATA_DIR}`);
+  console.log(`🗄️  Storage: ${firebase.isConfigured() ? "Firebase (no local data files)" : "in-memory (Firebase not configured)"}`);
+  if (firebase.isConfigured()) {
+    console.log(`🔥 Firebase storage: Connected (${process.env.FIREBASE_PROJECT_ID || "Realtime DB"})`);
+    await rehydrateFromFirebase();
+  } else {
+    console.log(`ℹ️ Firebase not configured. Using local ephemeral storage.`);
+  }
   console.log(`=============================================`);
 });
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`\n❌ [ToxicRadar Server] Port ${PORT} is already in use!`);
+    console.error(`   Another instance of ToxicRadar or another process is running on this port.`);
+    console.error(`\n👉 To free up port ${PORT}, run this command in your terminal:`);
+    console.error(`   kill -9 $(lsof -t -i:${PORT})`);
+    console.error(`\n👉 Alternatively, start the server on a different port:`);
+    console.error(`   PORT=3001 npm start\n`);
+    process.exit(1);
+  } else {
+    console.error("❌ [ToxicRadar Server] Unexpected server error:", err);
+    process.exit(1);
+  }
+});
+
 
