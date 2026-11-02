@@ -549,6 +549,9 @@ function summarizeRows(rows) {
       highestScore: toNumber(row["Highest Score"]) ?? highestScoreFromDimensions,
       highestDimensionName,
       dimensions,
+      positiveFactor: Number(row.positiveFactor ?? record?.positiveFactor ?? (Number(derivedOverallToxicity) <= 2 ? 3 : 1)),
+      negativeFactor: Number(row.negativeFactor ?? record?.negativeFactor ?? (Number(derivedOverallToxicity) >= 4 ? 4 : (Number(derivedOverallToxicity) === 3 ? 2 : 0))),
+      pronounStats: record?.pronounStats || null,
       detailItem: {
         email: {
           subject,
@@ -624,7 +627,13 @@ function recordToRow(record) {
       email,
       analysis: analysis ? { ...analysis, dimensions } : null,
       error,
+      positiveFactor: record?.positiveFactor,
+      negativeFactor: record?.negativeFactor,
+      pronounStats: record?.pronounStats,
     }),
+    positiveFactor: record?.positiveFactor,
+    negativeFactor: record?.negativeFactor,
+    pronounStats: record?.pronounStats,
   };
 }
 

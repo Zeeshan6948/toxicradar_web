@@ -56,6 +56,30 @@
       });
     },
 
+    // Non-Exploitative Autocomplete
+    async getAutocomplete(text) {
+      return request("/api/autocomplete", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+    },
+
+    // Pronoun & Egoistic Bias Evaluation
+    async getPronounBias(text) {
+      return request("/api/bias/pronouns", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+    },
+
+    // Training & Course Recommendations
+    async getTrainingRecommendations(context = {}) {
+      return request("/api/training/recommendations", {
+        method: "POST",
+        body: JSON.stringify(context),
+      });
+    },
+
     // Excel Logging & Summary
     async getExcelSummary() {
       return request("/api/excel/summary");

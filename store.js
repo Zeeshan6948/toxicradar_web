@@ -23,6 +23,7 @@
 const crypto = require("crypto");
 const firebase = require("./firebase");
 const exporter = require("./exporter");
+const analyzer = require("./analyzer");
 
 const RECORDS = "compose_records";
 const BATCHES = "import_batches";
@@ -63,6 +64,8 @@ function toDocument(record, extra = {}) {
   const analysis = record.analysis || null;
   const error = record.error ? String(record.error) : null;
   const now = new Date().toISOString();
+  const balance = analyzer.calculateBalanceFactors(email.textForAnalysis || email.body || "", analysis || {});
+
   return {
     email,
     analysis,
@@ -71,6 +74,9 @@ function toDocument(record, extra = {}) {
     overallToxicity: Number(analysis?.overallToxicityScore) || 0,
     level: analysis?.overallToxicityLabel || "",
     flag: Boolean(analysis?.overallFlag),
+    positiveFactor: record.positiveFactor ?? balance.positiveFactor,
+    negativeFactor: record.negativeFactor ?? balance.negativeFactor,
+    pronounStats: record.pronounStats ?? balance.pronounStats,
     createdAt: now,
     ...extra,
   };

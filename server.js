@@ -145,6 +145,46 @@ app.post("/api/analyze", analyzeLimiter, async (req, res) => {
   }
 });
 
+// Autocomplete endpoint (Non-exploitative inline completions using ChatGPT with fallback)
+app.post("/api/autocomplete", async (req, res) => {
+  try {
+    const { text } = req.body || {};
+    if (typeof text !== "string" || !text.trim()) {
+      return res.json({ success: true, suggestion: "" });
+    }
+    const keyToUse = getActiveKey();
+    const result = await analyzer.generateAutocomplete(text, keyToUse);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error("Autocomplete failed:", error);
+    res.json({ success: true, suggestion: "", source: "error" });
+  }
+});
+
+// Pronoun & egoistic bias evaluation endpoint
+app.post("/api/bias/pronouns", (req, res) => {
+  try {
+    const { text } = req.body || {};
+    const evaluation = analyzer.evaluatePronounBias(text || "");
+    res.json({ success: true, ...evaluation, evaluation });
+  } catch (error) {
+    console.error("Pronoun evaluation failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Training & course recommendations endpoint
+app.post("/api/training/recommendations", (req, res) => {
+  try {
+    const context = req.body || {};
+    const recommendations = analyzer.getTrainingRecommendations(context);
+    res.json({ success: true, ...recommendations });
+  } catch (error) {
+    console.error("Training recommendations failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Excel summary & dashboard endpoint - computed from Firebase records
 app.get("/api/excel/summary", async (req, res) => {
   try {

@@ -30,6 +30,16 @@
           <button class="nav-btn" data-view="reports" data-period="all">Total History</button>
         </nav>
 
+        <div id="sidebar-training-panel" class="sidebar-training-panel hidden">
+          <div class="sidebar-training-head">
+            <span class="training-badge">Recommended</span>
+            <h3 class="training-title">Leadership Training</h3>
+            <p class="training-subtitle">Coaching modules based on detected patterns</p>
+          </div>
+          <div id="sidebar-training-list" class="sidebar-training-list">
+            <!-- Populated dynamically via JS -->
+          </div>
+        </div>
       </aside>
 
       <main class="workspace">
@@ -126,6 +136,13 @@
                       <span id="live-warning-toggle-label">Activate Live Warning</span>
                     </button>
                     <button id="live-warning-info" class="info-icon-btn" type="button" aria-label="Live Warning info" title="Live Warning info">i</button>
+                    <button id="connect-watch-btn" class="ghost-btn" type="button" title="Pair your Apple Watch">Connect Watch</button>
+                    <span id="watch-pairing-code" class="mono hidden" title="Type this code on your Apple Watch"></span>
+                    <span id="biometric-badge" class="hidden" title="Live Apple Watch reading">
+                      <span id="watch-connection-label">Watch connected</span>
+                      &middot; &#9829; <strong id="bpm-value">-- BPM</strong>
+                      &middot; <span id="stress-level-label">Waiting...</span>
+                    </span>
                   </div>
                 </div>
                 <div class="compose-editor-wrap">
@@ -144,6 +161,28 @@
                     </div>
                   </div>
 
+                  <div id="pronoun-bias-banner" class="pronoun-bias-banner hidden" aria-live="polite">
+                    <div class="bias-banner-top">
+                      <div class="bias-banner-title-row">
+                        <span class="bias-badge">Egoistic Bias Alert</span>
+                        <span id="bias-meter-text" class="bias-meter-text">80% Singular ("I/Me") • 20% Collective ("We/Team")</span>
+                      </div>
+                      <p id="bias-coaching-message" class="bias-coaching-message">
+                        High self-referencing detected. Converting personal claims to team-centric framing enhances psychological safety and trust.
+                      </p>
+                    </div>
+                    <div id="bias-suggestion-box" class="bias-suggestion-box hidden">
+                      <div class="bias-suggestion-header">
+                        <strong>Team-Centric Alternative:</strong>
+                      </div>
+                      <div id="bias-suggestion-preview" class="bias-suggestion-preview"></div>
+                      <div class="bias-actions">
+                        <button id="bias-apply-btn" type="button" class="accent-btn small">Apply Team Framing</button>
+                        <button id="bias-dismiss-btn" type="button" class="ghost-btn small">Dismiss</button>
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="compose-textarea-layer">
                     <textarea
                       id="compose-body"
@@ -155,6 +194,12 @@
                       class="compose-highlight-overlay hidden"
                       aria-hidden="true"
                     ></div>
+                    <div id="compose-autocomplete-pill" class="compose-autocomplete-pill hidden">
+                      <span class="autocomplete-icon">✨</span>
+                      <span class="autocomplete-label">Press <kbd>Tab</kbd> or <kbd>→</kbd> to complete:</span>
+                      <span id="compose-autocomplete-text" class="autocomplete-suggestion"></span>
+                      <button id="compose-autocomplete-dismiss" type="button" class="autocomplete-dismiss" title="Dismiss suggestion (Esc)">&times;</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -258,6 +303,32 @@
                 <svg id="dimension-score-chart" class="report-histogram" role="img" aria-labelledby="dimension-score-title"></svg>
                 <div id="dimension-score-empty" class="report-chart-empty">No improvement data available.</div>
                 <div id="dimension-score-tooltip" class="report-chart-tooltip"></div>
+              </div>
+            </section>
+
+            <section id="weekly-balance-card" class="report-chart-card weekly-balance-card light-card hidden">
+              <div class="report-chart-topline">
+                <div>
+                  <p class="eyebrow green">Weekly Leadership Balance</p>
+                  <h3 id="weekly-balance-title">Positive vs. Negative Balance</h3>
+                  <p id="weekly-balance-caption" class="muted">Comparing collective team framing (We/Us) vs. self-centered and pressure markers (I/Me).</p>
+                </div>
+                <div id="weekly-balance-legend" class="report-legend" aria-label="Weekly balance legend">
+                  <span class="report-legend-item static">
+                    <span class="report-legend-swatch positive-swatch"></span>
+                    <span>Positive / Collective Factor</span>
+                  </span>
+                  <span class="report-legend-item static">
+                    <span class="report-legend-swatch negative-swatch"></span>
+                    <span>Negative / Egoistic Factor</span>
+                  </span>
+                </div>
+              </div>
+
+              <div id="weekly-balance-wrap" class="report-chart-wrap">
+                <svg id="weekly-balance-chart" class="report-histogram" role="img" aria-labelledby="weekly-balance-title"></svg>
+                <div id="weekly-balance-empty" class="report-chart-empty">No weekly balance data available.</div>
+                <div id="weekly-balance-tooltip" class="report-chart-tooltip"></div>
               </div>
             </section>
 
@@ -472,6 +543,57 @@
         </div>
 
         <p id="settings-feedback" class="muted"></p>
+      </div>
+    </div>
+
+    <div id="training-modal" class="modal hidden">
+      <div class="modal-backdrop" data-close-modal="training-modal"></div>
+      <div class="modal-panel training-modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow green">Leadership Coaching Lab</p>
+            <h3 id="training-modal-title">Leadership Training</h3>
+          </div>
+          <button class="modal-close-btn" type="button" data-close-modal="training-modal" aria-label="Close training modal">
+            &times;
+          </button>
+        </div>
+
+        <div class="training-modal-body">
+          <div class="training-meta-card">
+            <span id="training-modal-category" class="training-category-pill">Servant Leadership</span>
+            <span id="training-modal-duration" class="training-duration-pill">8 Min Read</span>
+            <span id="training-modal-target" class="training-target-pill">Target: Egoistic Bias</span>
+          </div>
+
+          <div class="training-section">
+            <h4 class="training-section-title">Core Objective</h4>
+            <p id="training-modal-objective" class="training-text"></p>
+          </div>
+
+          <div class="training-section">
+            <h4 class="training-section-title">Email Transformation Examples</h4>
+            <div class="training-comparison-grid">
+              <div class="comparison-card bad">
+                <span class="comp-label bad-label">❌ Problematic Phrasing</span>
+                <div id="training-modal-example-bad" class="comp-text"></div>
+              </div>
+              <div class="comparison-card good">
+                <span class="comp-label good-label">✅ Constructive / Team-Centric</span>
+                <div id="training-modal-example-good" class="comp-text"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="training-section">
+            <h4 class="training-section-title">Actionable Leadership Habits</h4>
+            <ul id="training-modal-habits" class="training-habits-list"></ul>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 20px; display: flex; justify-content: flex-end;">
+          <button type="button" class="accent-btn" data-close-modal="training-modal">Close & Apply to Draft</button>
+        </div>
       </div>
     </div>
 

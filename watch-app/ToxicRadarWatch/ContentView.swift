@@ -58,7 +58,7 @@ struct ContentView: View {
             Label(manager.statusMessage,
                   systemImage: manager.lastUploadOK ? "checkmark.circle" : "circle.dashed")
                 .font(.caption2)
-                .foregroundStyle(manager.lastUploadOK ? .green : .secondary)
+                .foregroundStyle(manager.lastUploadOK ? Color.green : Color.secondary)
 
             Button("Unpair") { manager.unpair() }
                 .font(.caption2)

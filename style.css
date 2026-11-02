@@ -2730,4 +2730,501 @@ td {
   color: #ffffff;
 }
 
+/* ==================== 1. INLINE AUTO-COMPLETE ==================== */
+.compose-autocomplete-pill {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(20, 25, 40, 0.95);
+  border: 1px solid rgba(79, 142, 247, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  font-size: 0.84rem;
+  max-width: calc(100% - 28px);
+  backdrop-filter: blur(8px);
+  animation: autocompleteFadeIn 0.2s ease-out;
+}
+
+@keyframes autocompleteFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.compose-autocomplete-pill .autocomplete-icon {
+  font-size: 0.95rem;
+}
+
+.compose-autocomplete-pill .autocomplete-label {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.compose-autocomplete-pill kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: var(--text);
+}
+
+.compose-autocomplete-pill .autocomplete-suggestion {
+  color: #79acff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.compose-autocomplete-pill .autocomplete-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.compose-autocomplete-pill .autocomplete-dismiss:hover {
+  color: var(--text);
+  transform: none;
+  filter: none;
+}
+
+/* ==================== 2. PRONOUN & EGOISTIC BIAS DETECTION ==================== */
+.pronoun-bias-banner {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 140, 66, 0.4);
+  background: linear-gradient(180deg, rgba(35, 26, 20, 0.96), rgba(24, 18, 16, 0.98));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  display: grid;
+  gap: 10px;
+  animation: biasSlideDown 0.22s ease-out;
+}
+
+@keyframes biasSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bias-banner-top {
+  display: grid;
+  gap: 6px;
+}
+
+.bias-banner-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bias-badge {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffb885;
+  background: rgba(255, 140, 66, 0.16);
+  border: 1px solid rgba(255, 140, 66, 0.3);
+}
+
+.bias-meter-text {
+  font-family: "DM Mono", monospace;
+  font-size: 0.8rem;
+  color: #ff9d5c;
+  font-weight: 500;
+}
+
+.bias-coaching-message {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #fff1e6;
+}
+
+.bias-suggestion-box {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(30, 42, 65, 0.85);
+  border: 1px solid rgba(79, 142, 247, 0.35);
+  display: grid;
+  gap: 8px;
+}
+
+.bias-suggestion-header {
+  font-size: 0.82rem;
+  color: #9bbfff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bias-suggestion-preview {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: #f3f5fb;
+  white-space: pre-wrap;
+}
+
+.bias-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.accent-btn.small, .ghost-btn.small {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}
+
+/* ==================== 3. WEEKLY BALANCE GRAPH ==================== */
+.weekly-balance-card {
+  margin-top: 24px;
+}
+
+.positive-swatch {
+  background: var(--green);
+}
+
+.negative-swatch {
+  background: var(--red);
+}
+
+.report-balance-pos-bar {
+  fill: #3ecf8e;
+  transition: opacity 0.15s ease;
+}
+
+.report-balance-neg-bar {
+  fill: #ff4d4d;
+  transition: opacity 0.15s ease;
+}
+
+.report-balance-center-line {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-dasharray: 4 4;
+}
+
+/* ==================== 4. DYNAMIC TRAINING RECOMMENDATIONS (SIDEBAR) ==================== */
+.sidebar-training-panel {
+  margin-top: 8px;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(20, 26, 42, 0.95), rgba(16, 21, 34, 0.98));
+  border: 1px solid rgba(79, 142, 247, 0.28);
+  display: grid;
+  gap: 10px;
+  animation: sidebarTrainingFadeIn 0.25s ease-out;
+}
+
+@keyframes sidebarTrainingFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sidebar-training-head {
+  display: grid;
+  gap: 4px;
+}
+
+.training-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: #79acff;
+  background: rgba(79, 142, 247, 0.15);
+  border: 1px solid rgba(79, 142, 247, 0.3);
+}
+
+.training-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.training-subtitle {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.sidebar-training-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.sidebar-training-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 6px;
+  transition: all 0.18s ease;
+}
+
+.sidebar-training-card:hover {
+  background: rgba(79, 142, 247, 0.08);
+  border-color: rgba(79, 142, 247, 0.3);
+  transform: translateY(-1px);
+}
+
+.training-card-category {
+  font-size: 0.68rem;
+  color: #9bbfff;
+  font-family: "DM Mono", monospace;
+  text-transform: uppercase;
+}
+
+.training-card-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+
+.training-card-btn {
+  width: 100%;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  background: rgba(79, 142, 247, 0.18);
+  border: 1px solid rgba(79, 142, 247, 0.35);
+  color: #79acff;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s ease;
+}
+
+.training-card-btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* ==================== TRAINING MODAL ==================== */
+.training-modal-panel {
+  max-width: 760px;
+  width: 90vw;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.training-modal-body {
+  display: grid;
+  gap: 20px;
+  margin-top: 14px;
+}
+
+.training-meta-card {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.training-category-pill, .training-duration-pill, .training-target-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: "DM Mono", monospace;
+  font-size: 0.75rem;
+}
+
+.training-category-pill {
+  background: rgba(79, 142, 247, 0.18);
+  color: #79acff;
+  border: 1px solid rgba(79, 142, 247, 0.3);
+}
+
+.training-duration-pill {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.training-target-pill {
+  background: rgba(255, 140, 66, 0.15);
+  color: #ff9d5c;
+  border: 1px solid rgba(255, 140, 66, 0.3);
+}
+
+.training-section {
+  display: grid;
+  gap: 8px;
+}
+
+.training-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.training-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.training-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.comparison-card {
+  padding: 14px;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-card.bad {
+  background: rgba(255, 77, 77, 0.08);
+  border: 1px solid rgba(255, 77, 77, 0.25);
+}
+
+.comparison-card.good {
+  background: rgba(62, 207, 142, 0.08);
+  border: 1px solid rgba(62, 207, 142, 0.25);
+}
+
+.comp-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.comp-label.bad-label {
+  color: #ff6b6b;
+}
+
+.comp-label.good-label {
+  color: #3ecf8e;
+}
+
+.comp-text {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text);
+  font-style: italic;
+}
+
+.training-habits-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ==================== LIGHT THEME OVERRIDES ==================== */
+[data-theme="light"] .compose-autocomplete-pill {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #93c5fd;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .compose-autocomplete-pill .autocomplete-suggestion {
+  color: #2563eb;
+}
+
+[data-theme="light"] .compose-autocomplete-pill kbd {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme="light"] .pronoun-bias-banner {
+  background: #fff7ed;
+  border-color: #fdba74;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.1);
+}
+
+[data-theme="light"] .bias-coaching-message {
+  color: #9a3412;
+}
+
+[data-theme="light"] .bias-meter-text {
+  color: #c2410c;
+}
+
+[data-theme="light"] .bias-suggestion-box {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+[data-theme="light"] .bias-suggestion-header {
+  color: #166534;
+}
+
+[data-theme="light"] .bias-suggestion-preview {
+  color: #14532d;
+}
+
+[data-theme="light"] .sidebar-training-panel {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .sidebar-training-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .sidebar-training-card:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+[data-theme="light"] .training-card-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .training-modal-panel {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+[data-theme="light"] .comparison-card.bad {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+[data-theme="light"] .comparison-card.good {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
 

@@ -590,8 +590,13 @@ async function requestAnalysisOnce(emailText, openaiApiKey, biometrics = null) {
   }
 
   const parsed = JSON.parse(clean);
+  const normalized = normalizeAnalysisPayload(parsed);
+  const factors = calculateBalanceFactors(emailText, normalized);
   return {
-    ...normalizeAnalysisPayload(parsed),
+    ...normalized,
+    pronounStats: factors.pronounStats,
+    positiveFactor: factors.positiveFactor,
+    negativeFactor: factors.negativeFactor,
     biometrics: biometrics || null,
     usage: data?.usage || null,
     model: data?.model || OPENAI_ANALYSIS_MODEL,
@@ -617,6 +622,340 @@ async function analyzeEmailText(emailText, openaiApiKey, biometrics = null) {
   throw lastError || new Error("Analysis failed after multiple attempts.");
 }
 
+// ==================== PRONOUN & EGOISTIC BIAS DETECTION ====================
+
+const SINGULAR_PRONOUNS_REGEX = /\b(I|me|my|mine|myself)\b/gi;
+const COLLECTIVE_IDENTIFIERS_REGEX = /\b(we|us|our|ours|ourselves|together|jointly|collaboratively)\b/gi;
+const COLLECTIVE_PHRASES_REGEX = /\b(as a team|our team|the team|team members|all of us|with the team|together with)\b/gi;
+
+function evaluatePronounBias(text) {
+  const content = String(text || "").trim();
+  if (!content) {
+    return {
+      singularCount: 0,
+      collectiveCount: 0,
+      totalCount: 0,
+      singularRatio: 0,
+      collectiveRatio: 0,
+      isEgoisticSkew: false,
+      severity: "none",
+      coachingMessage: "",
+      suggestedPhrasing: "",
+      transformedText: "",
+    };
+  }
+
+  const singularMatches = content.match(SINGULAR_PRONOUNS_REGEX) || [];
+  const singularCount = singularMatches.length;
+
+  const collectiveMatches = content.match(COLLECTIVE_IDENTIFIERS_REGEX) || [];
+  const collectivePhrases = content.match(COLLECTIVE_PHRASES_REGEX) || [];
+  const collectiveCount = collectiveMatches.length + collectivePhrases.length;
+
+  const totalCount = singularCount + collectiveCount;
+  const singularRatio = totalCount > 0 ? Math.round((singularCount / totalCount) * 100) / 100 : 0;
+  const collectiveRatio = totalCount > 0 ? Math.round((collectiveCount / totalCount) * 100) / 100 : 0;
+
+  // Skew threshold: At least 2 singular pronouns and either zero collective or singular ratio >= 65%
+  const isEgoisticSkew = singularCount >= 2 && (collectiveCount === 0 || singularRatio >= 0.65);
+  let severity = "none";
+  if (singularCount >= 4 && (collectiveCount === 0 || singularRatio >= 0.75)) {
+    severity = "high";
+  } else if (isEgoisticSkew) {
+    severity = "moderate";
+  }
+
+  let coachingMessage = "";
+  if (isEgoisticSkew) {
+    const sPct = Math.round(singularRatio * 100);
+    const cPct = Math.round(collectiveRatio * 100);
+    coachingMessage = `Egoistic Bias Alert: ${singularCount} singular references ("I", "me", "my") vs. ${collectiveCount} collective references ("we", "team") [${sPct}% vs. ${cPct}%]. Centering individual credit can diminish team psychological safety and trust.`;
+  }
+
+  // Generate team-centric phrasing conversion
+  let transformedText = content;
+  transformedText = transformedText
+    .replace(/\bI completed\b/gi, "Our team completed")
+    .replace(/\bI managed to\b/gi, "We managed to")
+    .replace(/\bI achieved\b/gi, "Our team achieved")
+    .replace(/\bI built\b/gi, "We built")
+    .replace(/\bI delivered\b/gi, "Our team delivered")
+    .replace(/\bI finished\b/gi, "We finished")
+    .replace(/\bI decided\b/gi, "We agreed as a team")
+    .replace(/\bI need you to\b/gi, "Let's work together to")
+    .replace(/\bI want you to\b/gi, "Could we collaborate to")
+    .replace(/\bI expect\b/gi, "Our goal is to have")
+    .replace(/\bmy project\b/gi, "our project")
+    .replace(/\bmy plan\b/gi, "our shared plan")
+    .replace(/\bmy team\b/gi, "our team")
+    .replace(/\bmy strategy\b/gi, "our collaborative strategy")
+    .replace(/\bmy accomplishment\b/gi, "our team milestone")
+    .replace(/\bmy goal\b/gi, "our shared goal")
+    .replace(/\bto me\b/gi, "with our team")
+    .replace(/\bsend me\b/gi, "share with our team")
+    .replace(/\bcontact me\b/gi, "connect with us");
+
+  let suggestedPhrasing = "";
+  if (transformedText !== content) {
+    suggestedPhrasing = transformedText;
+  } else if (isEgoisticSkew) {
+    suggestedPhrasing = content
+      .replace(/\bI\b/g, "We")
+      .replace(/\bmy\b/gi, "our")
+      .replace(/\bme\b/gi, "us");
+  }
+
+  return {
+    singularCount,
+    collectiveCount,
+    totalCount,
+    singularRatio,
+    collectiveRatio,
+    isEgoisticSkew,
+    severity,
+    coachingMessage,
+    suggestedPhrasing,
+    transformedText,
+  };
+}
+
+function calculateBalanceFactors(text, analysis = {}) {
+  const bias = evaluatePronounBias(text);
+  const toxicity = Number(analysis.overallToxicityScore || analysis.highestScore || analysis.overallToxicity) || 1;
+  const dimensions = Array.isArray(analysis.dimensions) ? analysis.dimensions : [];
+
+  // Positive factor: collective identifiers + constructive leadership bonus
+  const constructiveBonus = toxicity <= 2 ? 3 : (toxicity === 3 ? 1 : 0);
+  const positiveFactor = bias.collectiveCount * 2 + constructiveBonus;
+
+  // Negative factor: singular egoistic count + high toxicity / dimension penalties
+  let dimensionPenalty = 0;
+  for (const dim of dimensions) {
+    const score = Number(dim.score) || 1;
+    if (score >= 4) dimensionPenalty += 3;
+    else if (score === 3) dimensionPenalty += 1;
+  }
+  const toxicityPenalty = toxicity >= 4 ? 4 : (toxicity === 3 ? 2 : 0);
+  const negativeFactor = bias.singularCount * 1.5 + toxicityPenalty + dimensionPenalty;
+
+  return {
+    positiveFactor: Math.round(positiveFactor * 10) / 10,
+    negativeFactor: Math.round(negativeFactor * 10) / 10,
+    pronounStats: bias,
+  };
+}
+
+// ==================== NON-EXPLOITATIVE INLINE AUTO-COMPLETE ====================
+
+const AUTOCOMPLETE_SYSTEM_PROMPT = `You are an inline workplace writing coach for ToxicRadar.
+The author is drafting an email. Complete their current sentence or thought with a concise, natural continuation (4 to 12 words).
+STRICT PSYCHOLOGICAL SAFETY GUARDRAILS:
+- The continuation MUST be collaborative, psychologically safe, constructive, and respectful.
+- Strictly AVOID high-pressure, intimidating, passive-aggressive, or egoistic language.
+- DO NOT repeat what the user typed. Start immediately with the continuation words.
+- Return ONLY the raw continuation string. Do not use quotes, explanations, or conversational filler.`;
+
+function getOfflineCollaborativeCompletion(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return "";
+
+  const rules = [
+    { pattern: /\b(let me know if)\s*$/i, completion: "we can review this together during our next sync." },
+    { pattern: /\b(please make sure)\s*$/i, completion: "the team has all the resources needed to succeed." },
+    { pattern: /\b(we need to)\s*$/i, completion: "align as a group to deliver our shared goals." },
+    { pattern: /\b(i wanted to)\s*$/i, completion: "share this update and see how our team can collaborate on it." },
+    { pattern: /\b(can you please|could you please)\s*$/i, completion: "take a look when you have a moment, and let me know if you need support." },
+    { pattern: /\b(thanks for|thank you for)\s*$/i, completion: "everyone's hard work and commitment to our team's success." },
+    { pattern: /\b(i think we should)\s*$/i, completion: "discuss this together to ensure every perspective is heard." },
+    { pattern: /\b(as a team,? we)\s*$/i, completion: "can tackle this together while maintaining open communication." },
+    { pattern: /\b(could you|can you)\s*$/i, completion: "let us know what support our team can provide on this?" },
+    { pattern: /\b(looking forward to)\s*$/i, completion: "collaborating on this and achieving great results together." },
+    { pattern: /\b(moving forward,?)\s*$/i, completion: "let's maintain clear visibility and psychological safety across the team." },
+    { pattern: /\b(our goal is to)\s*$/i, completion: "support one another while delivering high-quality work." },
+    { pattern: /\b(don't hesitate to|feel free to)\s*$/i, completion: "reach out if you need assistance or want to talk things through." },
+    { pattern: /\b(i would appreciate)\s*$/i, completion: "your feedback so we can refine our team's approach." },
+    { pattern: /\b(to ensure we)\s*$/i, completion: "stay on track, let's keep communication open across the team." },
+    { pattern: /\b(i will make sure)\s*$/i, completion: "our team has the support and clarity needed for this." },
+    { pattern: /\b(if you have any)\s*$/i, completion: "questions or concerns, my door is always open." },
+    { pattern: /\b(great job on)\s*$/i, completion: "this milestone, the team's effort made all the difference." },
+  ];
+
+  for (const rule of rules) {
+    if (rule.pattern.test(trimmed)) {
+      return rule.completion;
+    }
+  }
+
+  if (/,\s*$/.test(trimmed)) {
+    return "and please let me know how our team can help.";
+  }
+  if (/\b(and|or|so|but)\s*$/i.test(trimmed)) {
+    return "we can connect to align on next steps together.";
+  }
+  return "and let's connect if anyone needs additional support or clarity.";
+}
+
+async function generateAutocomplete(contextText, apiKey) {
+  const trimmed = String(contextText || "").trim();
+  if (trimmed.length < 8) {
+    return { suggestion: "", source: "none" };
+  }
+
+  const effectiveKey = String(apiKey || process.env.OPENAI_API_KEY || "").trim();
+
+  // If no API key or offline, use the rule-based psychological safety engine
+  if (!effectiveKey) {
+    return {
+      suggestion: getOfflineCollaborativeCompletion(trimmed),
+      source: "offline-rules",
+    };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${effectiveKey}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_ANALYSIS_MODEL,
+        temperature: 0.2,
+        max_tokens: 35,
+        messages: [
+          { role: "system", content: AUTOCOMPLETE_SYSTEM_PROMPT },
+          { role: "user", content: `Email drafting context:\n"${trimmed}"\n\nContinue with a collaborative next phrase:` },
+        ],
+      }),
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`ChatGPT autocomplete failed (${response.status})`);
+    }
+
+    const data = await response.json();
+    const raw = data?.choices?.[0]?.message?.content || "";
+    let suggestion = raw.replace(/^["'\s]+|["'\s]+$/g, "").trim();
+
+    // Guardrail check: ensure suggestion is not empty and reasonably short
+    if (!suggestion || suggestion.length > 120) {
+      suggestion = getOfflineCollaborativeCompletion(trimmed);
+    }
+
+    return { suggestion, source: "chatgpt" };
+  } catch (_err) {
+    // Graceful offline fallback
+    return {
+      suggestion: getOfflineCollaborativeCompletion(trimmed),
+      source: "offline-fallback",
+    };
+  }
+}
+
+// ==================== DYNAMIC LEADERSHIP TRAINING MODULES ====================
+
+const STRUCTURED_TRAINING_MODULES = [
+  {
+    id: "servant-leadership",
+    category: "Servant Leadership",
+    title: "Servant Leadership & Shared Credit",
+    targetDimension: "Genuine Egoistic Behaviors",
+    duration: "8 min read",
+    objective: "Transition from individual self-promotion ('I/Me') to collective recognition ('We/Team') that builds psychological ownership and team cohesion.",
+    badExample: "I delivered this project on time and I expect senior leadership to acknowledge my hard work.",
+    goodExample: "Our team delivered this project on time together; I am deeply grateful for everyone's dedication to this milestone.",
+    habits: [
+      "Use 'We' instead of 'I' when communicating team accomplishments to leadership.",
+      "Explicitly name and praise contributing colleagues in project updates.",
+      "Frame leadership as removing obstacles for your team rather than directing credit upward.",
+    ],
+  },
+  {
+    id: "psychological-safety",
+    category: "Psychological Safety",
+    title: "Psychological Safety & De-escalating Pressure",
+    targetDimension: "Exerting Pressure",
+    duration: "7 min read",
+    objective: "Communicate high-priority deadlines and expectations without intimidation, ultimatum language, or inducing anxiety.",
+    badExample: "Have this finished by 5 PM today or don't bother coming to the client presentation.",
+    goodExample: "Our team target is to wrap this up by 5 PM. Please let me know early if you run into blockers so we can support you.",
+    habits: [
+      "Pair urgent requests with open offers of support and resource removal.",
+      "Avoid implied threats or punitive framing around unexpected delays.",
+      "Encourage team members to surface roadblocks early without fear of blame.",
+    ],
+  },
+  {
+    id: "collaborative-influence",
+    category: "Collaborative Communication",
+    title: "Collaborative Communication & Transparent Influence",
+    targetDimension: "Manipulating Followers",
+    duration: "9 min read",
+    objective: "Eliminate guilt-tripping and emotional manipulation in favor of transparent, respectful, and direct workplace dialogue.",
+    badExample: "After everything leadership has done for you, the least you could do is take on this weekend workload.",
+    goodExample: "We have an unexpected weekend coverage need. Let's discuss as a team who has capacity or how we can balance the schedule.",
+    habits: [
+      "State business objectives directly without attaching personal guilt or moral obligation.",
+      "Invite genuine two-way feedback before finalizing operational decisions.",
+      "Separate objective project needs from emotional leverage.",
+    ],
+  },
+  {
+    id: "autonomy-support",
+    category: "Autonomy Support",
+    title: "Autonomy Support & Follower Development",
+    targetDimension: "Undermining Development",
+    duration: "8 min read",
+    objective: "Foster junior and team initiative by mentoring through questions rather than micromanaging or dismissing independent thought.",
+    badExample: "Just stick to the instructions given; you don't have enough seniority to suggest changes.",
+    goodExample: "I value your initiative in looking at this process. Let's review your proposal together during our next 1-on-1.",
+    habits: [
+      "Ask 'What approach do you recommend?' before prescribing a solution.",
+      "Delegate problem ownership, not merely mechanical task execution.",
+      "Celebrate constructive experimentation and frame missteps as collective learning.",
+    ],
+  },
+];
+
+function getTrainingRecommendations(context = {}) {
+  const negativeScore = Number(context.negativeScore || context.overallToxicityScore || 1);
+  const egoisticSkew = Boolean(context.isEgoisticSkew);
+  const dimensionNames = Array.isArray(context.dimensions)
+    ? context.dimensions.map((d) => (d.name || d).toLowerCase())
+    : [];
+
+  // Sort modules dynamically so the most relevant topic is presented first
+  const sorted = [...STRUCTURED_TRAINING_MODULES].sort((a, b) => {
+    let scoreA = 0;
+    let scoreB = 0;
+    if (egoisticSkew && a.id === "servant-leadership") scoreA += 10;
+    if (egoisticSkew && b.id === "servant-leadership") scoreB += 10;
+
+    if (dimensionNames.some((d) => d.includes("pressure")) && a.id === "psychological-safety") scoreA += 8;
+    if (dimensionNames.some((d) => d.includes("pressure")) && b.id === "psychological-safety") scoreB += 8;
+
+    if (dimensionNames.some((d) => d.includes("manipulat")) && a.id === "collaborative-influence") scoreA += 8;
+    if (dimensionNames.some((d) => d.includes("manipulat")) && b.id === "collaborative-influence") scoreB += 8;
+
+    if (dimensionNames.some((d) => d.includes("development")) && a.id === "autonomy-support") scoreA += 8;
+    if (dimensionNames.some((d) => d.includes("development")) && b.id === "autonomy-support") scoreB += 8;
+
+    return scoreB - scoreA;
+  });
+
+  return {
+    modules: sorted,
+    negativeIndex: negativeScore,
+    recommendedCount: sorted.length,
+    timestamp: new Date().toISOString(),
+  };
+}
+
 module.exports = {
   OPENAI_ANALYSIS_MODEL,
   ELTC_SYSTEM_PROMPT,
@@ -624,4 +963,10 @@ module.exports = {
   parsePstFile,
   applyFilters,
   analyzeEmailText,
+  evaluatePronounBias,
+  calculateBalanceFactors,
+  generateAutocomplete,
+  getOfflineCollaborativeCompletion,
+  getTrainingRecommendations,
+  STRUCTURED_TRAINING_MODULES,
 };

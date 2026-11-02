@@ -12,6 +12,8 @@
    `watch-app/ToxicRadarWatch/` (tick "Copy items if needed").
 4. Open `Config.swift` and set `serverURL` to your deployed https address.
 5. Target > **Signing & Capabilities** > **+ Capability** > add **HealthKit**.
+   Then **+ Capability** > **Background Modes** > tick **Workout Processing**
+   (without this, watchOS suspends the app when you lower your wrist and readings stop).
 6. Target > **Info** tab, add:
    - `Privacy - Health Share Usage Description`: *ToxicRadar reads your heart rate and HRV while you write messages to show your stress level.*
    - `Privacy - Health Update Usage Description`: *ToxicRadar starts a temporary session to receive live heart rate. Nothing is saved to Health.*

@@ -98,6 +98,13 @@ const state = {
   isLiveAnalyzing: false,
   isExporting: false,
   cancelRequested: false,
+  autocompleteSuggestion: "",
+  autocompleteDebounceId: null,
+  autocompleteDismissedFor: "",
+  pronounBiasResult: null,
+  pronounBiasDismissedFor: "",
+  trainingModules: [],
+  selectedTrainingModule: null,
 };
 
 const elements = {};
@@ -270,6 +277,31 @@ function cacheDom() {
   elements.themeBtnDark = document.getElementById("theme-btn-dark");
   elements.themeBtnLight = document.getElementById("theme-btn-light");
   elements.settingsFeedback = document.getElementById("settings-feedback");
+  elements.composeAutocompletePill = document.getElementById("compose-autocomplete-pill");
+  elements.composeAutocompleteText = document.getElementById("compose-autocomplete-text");
+  elements.composeAutocompleteDismiss = document.getElementById("compose-autocomplete-dismiss");
+  elements.pronounBiasBanner = document.getElementById("pronoun-bias-banner");
+  elements.biasMeterText = document.getElementById("bias-meter-text");
+  elements.biasCoachingMessage = document.getElementById("bias-coaching-message");
+  elements.biasSuggestionBox = document.getElementById("bias-suggestion-box");
+  elements.biasSuggestionPreview = document.getElementById("bias-suggestion-preview");
+  elements.biasApplyBtn = document.getElementById("bias-apply-btn");
+  elements.biasDismissBtn = document.getElementById("bias-dismiss-btn");
+  elements.weeklyBalanceCard = document.getElementById("weekly-balance-card");
+  elements.weeklyBalanceChart = document.getElementById("weekly-balance-chart");
+  elements.weeklyBalanceEmpty = document.getElementById("weekly-balance-empty");
+  elements.weeklyBalanceTooltip = document.getElementById("weekly-balance-tooltip");
+  elements.sidebarTrainingPanel = document.getElementById("sidebar-training-panel");
+  elements.sidebarTrainingList = document.getElementById("sidebar-training-list");
+  elements.trainingModal = document.getElementById("training-modal");
+  elements.trainingModalTitle = document.getElementById("training-modal-title");
+  elements.trainingModalCategory = document.getElementById("training-modal-category");
+  elements.trainingModalDuration = document.getElementById("training-modal-duration");
+  elements.trainingModalTarget = document.getElementById("training-modal-target");
+  elements.trainingModalObjective = document.getElementById("training-modal-objective");
+  elements.trainingModalExampleBad = document.getElementById("training-modal-example-bad");
+  elements.trainingModalExampleGood = document.getElementById("training-modal-example-good");
+  elements.trainingModalHabits = document.getElementById("training-modal-habits");
   elements.summaryMetricTooltip = document.createElement("div");
   elements.summaryMetricTooltip.className = "summary-metric-tooltip";
   document.body.appendChild(elements.summaryMetricTooltip);
@@ -1744,6 +1776,250 @@ function renderDimensionScoreChart(rows) {
   });
 }
 
+const SINGULAR_PRONOUNS_REGEX = /\b(i|me|my|mine|myself)\b/gi;
+const COLLECTIVE_IDENTIFIERS_REGEX = /\b(we|us|our|ours|ourselves|team|together|everyone|collaborat\w*)\b/gi;
+const COLLECTIVE_PHRASES_REGEX = /\b(as a team|our team|with the team|together with|joint effort|shared goal|team effort)\b/gi;
+
+function evaluatePronounBiasLocal(text) {
+  const content = String(text || "").trim();
+  if (!content) {
+    return {
+      singularCount: 0,
+      collectiveCount: 0,
+      totalCount: 0,
+      singularRatio: 0,
+      collectiveRatio: 0,
+      isEgoisticSkew: false,
+      severity: "none",
+      coachingMessage: "",
+      suggestedPhrasing: "",
+      transformedText: "",
+    };
+  }
+
+  const singularMatches = content.match(SINGULAR_PRONOUNS_REGEX) || [];
+  const singularCount = singularMatches.length;
+
+  const collectiveMatches = content.match(COLLECTIVE_IDENTIFIERS_REGEX) || [];
+  const collectivePhrases = content.match(COLLECTIVE_PHRASES_REGEX) || [];
+  const collectiveCount = collectiveMatches.length + collectivePhrases.length;
+
+  const totalCount = singularCount + collectiveCount;
+  const singularRatio = totalCount > 0 ? Math.round((singularCount / totalCount) * 100) / 100 : 0;
+  const collectiveRatio = totalCount > 0 ? Math.round((collectiveCount / totalCount) * 100) / 100 : 0;
+
+  const isEgoisticSkew = singularCount >= 2 && (collectiveCount === 0 || singularRatio >= 0.65);
+  let severity = "none";
+  if (singularCount >= 4 && (collectiveCount === 0 || singularRatio >= 0.75)) {
+    severity = "high";
+  } else if (isEgoisticSkew) {
+    severity = "moderate";
+  }
+
+  let coachingMessage = "";
+  if (isEgoisticSkew) {
+    const sPct = Math.round(singularRatio * 100);
+    const cPct = Math.round(collectiveRatio * 100);
+    coachingMessage = `Egoistic Bias Alert: ${singularCount} singular references ("I", "me", "my") vs. ${collectiveCount} collective references ("we", "team") [${sPct}% vs. ${cPct}%]. Centering individual credit can diminish team psychological safety and trust.`;
+  }
+
+  let transformedText = content;
+  transformedText = transformedText
+    .replace(/\bI completed\b/gi, "Our team completed")
+    .replace(/\bI managed to\b/gi, "We managed to")
+    .replace(/\bI achieved\b/gi, "Our team achieved")
+    .replace(/\bI built\b/gi, "We built")
+    .replace(/\bI delivered\b/gi, "Our team delivered")
+    .replace(/\bI finished\b/gi, "We finished")
+    .replace(/\bI decided\b/gi, "We agreed as a team")
+    .replace(/\bI need you to\b/gi, "Let's work together to")
+    .replace(/\bI want you to\b/gi, "Could we collaborate to")
+    .replace(/\bI expect\b/gi, "Our goal is to have")
+    .replace(/\bmy project\b/gi, "our project")
+    .replace(/\bmy plan\b/gi, "our shared plan")
+    .replace(/\bmy team\b/gi, "our team")
+    .replace(/\bmy strategy\b/gi, "our collaborative strategy")
+    .replace(/\bmy accomplishment\b/gi, "our team milestone")
+    .replace(/\bmy goal\b/gi, "our shared goal")
+    .replace(/\bto me\b/gi, "with our team")
+    .replace(/\bsend me\b/gi, "share with our team")
+    .replace(/\bcontact me\b/gi, "connect with us");
+
+  let suggestedPhrasing = "";
+  if (transformedText !== content) {
+    suggestedPhrasing = transformedText;
+  } else if (isEgoisticSkew) {
+    suggestedPhrasing = content
+      .replace(/\bI\b/g, "We")
+      .replace(/\bmy\b/gi, "our")
+      .replace(/\bme\b/gi, "us");
+  }
+
+  return {
+    singularCount,
+    collectiveCount,
+    totalCount,
+    singularRatio,
+    collectiveRatio,
+    isEgoisticSkew,
+    severity,
+    coachingMessage,
+    suggestedPhrasing,
+    transformedText,
+  };
+}
+
+function buildWeeklyBalanceBuckets(rows, config) {
+  const startDate = config?.selectedWeekStart || addDays(startOfDay(new Date()), -6);
+  const buckets = [];
+
+  for (let i = 0; i < 7; i++) {
+    const dayDate = addDays(startDate, i);
+    const dayKey = formatLocalDateKey(dayDate);
+    const dayLabel = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "numeric", day: "numeric" }).format(dayDate);
+
+    const dayRows = (rows || []).filter((row) => {
+      const d = parseSummaryDate(row.date);
+      return d && formatLocalDateKey(d) === dayKey;
+    });
+
+    let posFactor = 0;
+    let negFactor = 0;
+
+    for (const r of dayRows) {
+      if (typeof r.positiveFactor === "number" && typeof r.negativeFactor === "number") {
+        posFactor += r.positiveFactor;
+        negFactor += r.negativeFactor;
+      } else {
+        const text = r.originalText || r.subject || "";
+        const bias = evaluatePronounBiasLocal(text);
+        const tox = Number(r.overallToxicity) || 1;
+        const posBonus = tox <= 2 ? 3 : (tox === 3 ? 1 : 0);
+        const toxPenalty = tox >= 4 ? 4 : (tox === 3 ? 2 : 0);
+        posFactor += bias.collectiveCount * 2 + posBonus;
+        negFactor += bias.singularCount * 1.5 + toxPenalty;
+      }
+    }
+
+    const totalFactor = posFactor + negFactor;
+    const posPercent = totalFactor > 0 ? Math.round((posFactor / totalFactor) * 100) : 50;
+    const negPercent = totalFactor > 0 ? (100 - posPercent) : 50;
+
+    buckets.push({
+      date: dayDate,
+      key: dayKey,
+      label: dayLabel,
+      messageCount: dayRows.length,
+      posFactor: Math.round(posFactor * 10) / 10,
+      negFactor: Math.round(negFactor * 10) / 10,
+      posPercent,
+      negPercent,
+    });
+  }
+
+  return buckets;
+}
+
+function renderWeeklyBalanceChart(buckets) {
+  if (!elements.weeklyBalanceChart) return;
+
+  const totalMessages = buckets.reduce((sum, b) => sum + b.messageCount, 0);
+  elements.weeklyBalanceEmpty?.classList.toggle("hidden", totalMessages > 0);
+  elements.weeklyBalanceChart.classList.toggle("hidden", totalMessages === 0);
+
+  if (totalMessages === 0) return;
+
+  const svgWidth = 960;
+  const svgHeight = 360;
+  const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+  const plotWidth = svgWidth - margin.left - margin.right;
+  const plotHeight = svgHeight - margin.top - margin.bottom;
+
+  const maxVal = Math.max(10, ...buckets.map((b) => Math.max(b.posFactor, b.negFactor)));
+  const yTicks = [0, Math.round(maxVal * 0.25), Math.round(maxVal * 0.5), Math.round(maxVal * 0.75), Math.round(maxVal)];
+
+  const yForVal = (val) => margin.top + plotHeight - (Math.min(maxVal, val) / maxVal) * plotHeight;
+
+  let gridHtml = "";
+  for (const tick of yTicks) {
+    const y = yForVal(tick);
+    gridHtml += `
+      <line class="report-grid-line" x1="${margin.left}" y1="${y}" x2="${svgWidth - margin.right}" y2="${y}"></line>
+      <text class="report-axis-label" x="${margin.left - 12}" y="${y + 4}" text-anchor="end">${tick}</text>
+    `;
+  }
+
+  const groupWidth = plotWidth / buckets.length;
+  const barWidth = Math.max(12, Math.min(32, groupWidth * 0.28));
+  let barsHtml = "";
+  let targetsHtml = "";
+
+  buckets.forEach((bucket, index) => {
+    const groupX = margin.left + index * groupWidth;
+    const groupCenter = groupX + groupWidth / 2;
+
+    const posX = groupCenter - barWidth - 4;
+    const posY = yForVal(bucket.posFactor);
+    const posHeight = Math.max(2, margin.top + plotHeight - posY);
+
+    const negX = groupCenter + 4;
+    const negY = yForVal(bucket.negFactor);
+    const negHeight = Math.max(2, margin.top + plotHeight - negY);
+
+    barsHtml += `
+      <rect class="report-balance-pos-bar" x="${posX}" y="${posY}" width="${barWidth}" height="${posHeight}" rx="4"></rect>
+      <rect class="report-balance-neg-bar" x="${negX}" y="${negY}" width="${barWidth}" height="${negHeight}" rx="4"></rect>
+      ${renderReportXAxisLabel(bucket.label, groupCenter, margin.top + plotHeight + 28)}
+    `;
+
+    targetsHtml += `
+      <rect class="report-hover-target" x="${groupX}" y="${margin.top}" width="${groupWidth}" height="${plotHeight}" data-balance-index="${index}"></rect>
+    `;
+  });
+
+  elements.weeklyBalanceChart.setAttribute("viewBox", `0 0 ${svgWidth} ${svgHeight}`);
+  elements.weeklyBalanceChart.innerHTML = `
+    <line class="report-axis-line" x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${svgWidth - margin.right}" y2="${margin.top + plotHeight}"></line>
+    <line class="report-axis-line" x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + plotHeight}"></line>
+    <text class="report-y-axis-title" x="${margin.left - 48}" y="${margin.top - 14}" text-anchor="start">Factor Score</text>
+    <text class="report-x-axis-title" x="${svgWidth - margin.right + 10}" y="${margin.top + plotHeight + 6}" text-anchor="start">Day</text>
+    ${gridHtml}
+    ${barsHtml}
+    ${targetsHtml}
+  `;
+
+  elements.weeklyBalanceChart.querySelectorAll("[data-balance-index]").forEach((target) => {
+    target.addEventListener("mousemove", (event) => {
+      const idx = Number(target.getAttribute("data-balance-index"));
+      const bucket = buckets[idx];
+      showWeeklyBalanceTooltip(event, bucket);
+    });
+    target.addEventListener("mouseleave", hideWeeklyBalanceTooltip);
+  });
+}
+
+function showWeeklyBalanceTooltip(event, bucket) {
+  if (!elements.weeklyBalanceTooltip) return;
+  const isHealthy = bucket.posFactor >= bucket.negFactor;
+  elements.weeklyBalanceTooltip.innerHTML = `
+    <strong>${escapeHtml(bucket.label)}</strong>
+    <span>Messages: ${bucket.messageCount}</span>
+    <span style="color: #3ecf8e;">Positive Factor: ${bucket.posFactor} (${bucket.posPercent}%)</span>
+    <span style="color: #ff4d4d;">Negative Factor: ${bucket.negFactor} (${bucket.negPercent}%)</span>
+    <span style="font-weight: 600; color: ${isHealthy ? '#3ecf8e' : '#ff9d5c'};">
+      Status: ${isHealthy ? 'Healthy Team Alignment' : 'Egoistic/Pressure Skew'}
+    </span>
+  `;
+  const chartRect = elements.weeklyBalanceCard.getBoundingClientRect();
+  elements.weeklyBalanceTooltip.style.left = `${event.clientX - chartRect.left + 14}px`;
+  elements.weeklyBalanceTooltip.style.top = `${event.clientY - chartRect.top + 14}px`;
+  elements.weeklyBalanceTooltip.classList.add("visible");
+}
+
+function hideWeeklyBalanceTooltip() {
+  elements.weeklyBalanceTooltip?.classList.remove("visible");
+}
+
 function renderReportHistogram(buckets) {
   const metric = state.reportChart.metric;
   const chartType = state.reportChart.type;
@@ -1933,6 +2209,14 @@ function updateReportDashboard() {
   elements.reportHistoryNav.classList.toggle("hidden", !isHistory);
   elements.dimensionScoreCard?.classList.toggle("hidden", false);
   renderDimensionScoreChart(rows);
+
+  // Feature 3: Weekly Report Positive vs. Negative Balance Graph
+  elements.weeklyBalanceCard?.classList.toggle("hidden", !isWeekly);
+  if (isWeekly) {
+    const weeklyBuckets = buildWeeklyBalanceBuckets(rows, config);
+    renderWeeklyBalanceChart(weeklyBuckets);
+  }
+
   if (isHistory) {
     elements.reportHistoryLabel.textContent = config.historyStart && config.historyEnd
       ? formatDateRangeLabel(config.historyStart, config.historyEnd)
@@ -2136,6 +2420,7 @@ function updateDashboardInsights() {
     updateSummaryFilterControls();
     renderEmailSummaryTable([]);
     updateReportDashboard();
+    updateSidebarTrainingRecommendations();
     return;
   }
 
@@ -2145,6 +2430,7 @@ function updateDashboardInsights() {
   updateSummaryFilterControls();
   renderEmailSummaryTable(getFilteredSummaryRows());
   updateReportDashboard();
+  updateSidebarTrainingRecommendations();
 }
 
 function isNegativeSummaryRow(row) {
@@ -2687,6 +2973,12 @@ function renderComposeResult() {
   elements.composeLogPath.textContent = state.composeLogPath
     ? `Saved to: ${state.composeLogPath}`
     : "";
+  if (item.analysis) {
+    updateSidebarTrainingRecommendations({
+      negativeScore: item.analysis.highestScore,
+      dimensions: item.analysis.dimensions,
+    });
+  }
 }
 
 async function applyComposeRewrite() {
@@ -2940,7 +3232,7 @@ async function analyzeComposeMessage() {
     if (isElectron) {
       analysis = await analyzer.analyzeEmailText(email.textForAnalysis, state.openaiApiKey);
     } else {
-      const biometricsData = watchConnected ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
+      const biometricsData = watchConnected && currentBpm ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
       const res = await window.apiClient.analyze(email.textForAnalysis, biometricsData);
       analysis = res.analysis;
     }
@@ -3001,7 +3293,7 @@ async function runLiveWarningAnalysis(_snapshotText) {
     if (isElectron) {
       analysis = await analyzer.analyzeEmailText(snapshotText, state.openaiApiKey);
     } else {
-      const biometricsData = watchConnected ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
+      const biometricsData = watchConnected && currentBpm ? { bpm: currentBpm, stressLevel: currentStressLevel } : null;
       const res = await window.apiClient.analyze(snapshotText, biometricsData);
       analysis = res.analysis;
     }
@@ -3093,6 +3385,337 @@ function scheduleLiveWarningAnalysis(options = {}) {
     liveAnalysisDebounceId = null;
     runLiveWarningAnalysis(snapshotText);
   }, delayMs);
+}
+
+// ==================== NON-EXPLOITATIVE INLINE AUTOCOMPLETE ====================
+
+function scheduleAutocomplete() {
+  if (state.autocompleteDebounceId) {
+    clearTimeout(state.autocompleteDebounceId);
+    state.autocompleteDebounceId = null;
+  }
+
+  const currentText = elements.composeBody.value;
+  const trimmed = currentText.trim();
+  if (trimmed.length < 8 || currentText === state.autocompleteDismissedFor) {
+    hideAutocomplete();
+    return;
+  }
+
+  state.autocompleteDebounceId = setTimeout(async () => {
+    state.autocompleteDebounceId = null;
+    const textAtTrigger = elements.composeBody.value;
+    const trimmedAtTrigger = textAtTrigger.trim();
+    if (trimmedAtTrigger.length < 8 || textAtTrigger === state.autocompleteDismissedFor) {
+      hideAutocomplete();
+      return;
+    }
+
+    try {
+      let res = null;
+      if (isElectron && analyzer?.generateAutocomplete) {
+        res = await analyzer.generateAutocomplete(trimmedAtTrigger, state.openaiApiKey);
+      } else if (window.apiClient?.getAutocomplete) {
+        res = await window.apiClient.getAutocomplete(trimmedAtTrigger);
+      }
+
+      // Check if user continued typing while the request was resolving
+      if (elements.composeBody.value !== textAtTrigger) {
+        return;
+      }
+
+      if (res && res.suggestion) {
+        showAutocomplete(res.suggestion);
+      } else {
+        hideAutocomplete();
+      }
+    } catch (_err) {
+      hideAutocomplete();
+    }
+  }, 350);
+}
+
+function showAutocomplete(suggestion) {
+  if (!suggestion) {
+    hideAutocomplete();
+    return;
+  }
+  state.autocompleteSuggestion = suggestion;
+  if (elements.composeAutocompleteText) {
+    elements.composeAutocompleteText.textContent = suggestion;
+  }
+  if (elements.composeAutocompletePill) {
+    elements.composeAutocompletePill.classList.remove("hidden");
+  }
+}
+
+function hideAutocomplete(options = {}) {
+  state.autocompleteSuggestion = "";
+  if (elements.composeAutocompletePill) {
+    elements.composeAutocompletePill.classList.add("hidden");
+  }
+  if (options.dismiss) {
+    state.autocompleteDismissedFor = elements.composeBody.value;
+  }
+}
+
+function acceptAutocomplete() {
+  if (!state.autocompleteSuggestion) return false;
+  const currentVal = elements.composeBody.value;
+  const suggestion = state.autocompleteSuggestion;
+  const needsSpace = currentVal.length > 0 && !/\s$/.test(currentVal) && !/^\s/.test(suggestion);
+  const newVal = currentVal + (needsSpace ? " " : "") + suggestion;
+  elements.composeBody.value = newVal;
+  elements.composeBody.selectionStart = elements.composeBody.selectionEnd = newVal.length;
+  hideAutocomplete();
+  state.autocompleteDismissedFor = "";
+
+  refreshComposeHighlightsFromCurrentText();
+  scheduleLiveWarningAnalysis();
+  handleComposePronounBias();
+  setComposeStatus("Collaborative autocomplete suggestion accepted.");
+  return true;
+}
+
+// ==================== PRONOUN & EGOISTIC BIAS DETECTION ====================
+
+let pronounBiasDebounceId = null;
+
+function handleComposePronounBias() {
+  if (pronounBiasDebounceId) {
+    clearTimeout(pronounBiasDebounceId);
+  }
+  pronounBiasDebounceId = setTimeout(async () => {
+    pronounBiasDebounceId = null;
+    const currentText = elements.composeBody.value;
+    const trimmed = currentText.trim();
+    if (trimmed.length < 15 || trimmed === state.pronounBiasDismissedFor) {
+      hidePronounBiasBanner();
+      return;
+    }
+
+    try {
+      let result = null;
+      if (isElectron && analyzer?.evaluatePronounBias) {
+        result = analyzer.evaluatePronounBias(trimmed);
+      } else if (window.apiClient?.getPronounBias) {
+        result = await window.apiClient.getPronounBias(trimmed);
+      } else {
+        result = evaluatePronounBiasLocal(trimmed);
+      }
+
+      if (elements.composeBody.value.trim() !== trimmed) {
+        return;
+      }
+
+      if (result?.evaluation) {
+        result = result.evaluation;
+      }
+
+      if (result && result.isEgoisticSkew) {
+        state.pronounBiasResult = result;
+        const sPct = Math.round(result.singularRatio * 100);
+        const cPct = Math.round(result.collectiveRatio * 100);
+        if (elements.biasMeterText) {
+          elements.biasMeterText.textContent = `${result.singularCount} Singular ("I/Me", ${sPct}%) • ${result.collectiveCount} Collective ("We/Team", ${cPct}%)`;
+        }
+        if (elements.biasCoachingMessage) {
+          elements.biasCoachingMessage.textContent = result.coachingMessage || "Centering individual credit over team contribution may diminish psychological safety.";
+        }
+        if (result.suggestedPhrasing && result.suggestedPhrasing !== trimmed) {
+          if (elements.biasSuggestionPreview) {
+            elements.biasSuggestionPreview.textContent = result.suggestedPhrasing;
+          }
+          if (elements.biasSuggestionBox) {
+            elements.biasSuggestionBox.classList.remove("hidden");
+          }
+        } else {
+          if (elements.biasSuggestionBox) {
+            elements.biasSuggestionBox.classList.add("hidden");
+          }
+        }
+        if (elements.pronounBiasBanner) {
+          elements.pronounBiasBanner.classList.remove("hidden");
+        }
+        updateSidebarTrainingRecommendations({
+          isEgoisticSkew: true,
+          negativeScore: 2,
+        });
+      } else {
+        hidePronounBiasBanner();
+      }
+    } catch (_err) {
+      hidePronounBiasBanner();
+    }
+  }, 300);
+}
+
+function hidePronounBiasBanner(options = {}) {
+  if (elements.pronounBiasBanner) {
+    elements.pronounBiasBanner.classList.add("hidden");
+  }
+  if (options.dismiss) {
+    state.pronounBiasDismissedFor = elements.composeBody.value.trim();
+  }
+}
+
+function applyTeamCentricPhrasing() {
+  if (!state.pronounBiasResult?.suggestedPhrasing) return;
+  elements.composeBody.value = state.pronounBiasResult.suggestedPhrasing;
+  state.pronounBiasResult = null;
+  hidePronounBiasBanner({ dismiss: true });
+  refreshComposeHighlightsFromCurrentText();
+  scheduleLiveWarningAnalysis();
+  setComposeStatus("Team-centric phrasing applied to draft.");
+}
+
+// ==================== DYNAMIC LEADERSHIP TRAINING RECOMMENDATIONS ====================
+
+const FALLBACK_TRAINING_MODULES = [
+  {
+    id: "servant-leadership",
+    category: "Servant Leadership",
+    title: "Servant Leadership & Shared Credit",
+    targetDimension: "Genuine Egoistic Behaviors",
+    duration: "8 min read",
+    objective: "Transition from individual self-promotion ('I/Me') to collective recognition ('We/Team') that builds psychological ownership and team cohesion.",
+    badExample: "I delivered this project on time and I expect senior leadership to acknowledge my hard work.",
+    goodExample: "Our team delivered this project on time together; I am deeply grateful for everyone's dedication to this milestone.",
+    habits: [
+      "Use 'We' instead of 'I' when communicating team accomplishments to leadership.",
+      "Explicitly name and praise contributing colleagues in project updates.",
+      "Frame leadership as removing obstacles for your team rather than directing credit upward.",
+    ],
+  },
+  {
+    id: "psychological-safety",
+    category: "Psychological Safety",
+    title: "Psychological Safety & De-escalating Pressure",
+    targetDimension: "Exerting Pressure",
+    duration: "7 min read",
+    objective: "Communicate high-priority deadlines and expectations without intimidation, ultimatum language, or inducing anxiety.",
+    badExample: "Have this finished by 5 PM today or don't bother coming to the client presentation.",
+    goodExample: "Our team target is to wrap this up by 5 PM. Please let me know early if you run into blockers so we can support you.",
+    habits: [
+      "Pair urgent requests with open offers of support and resource removal.",
+      "Avoid implied threats or punitive framing around unexpected delays.",
+      "Encourage team members to surface roadblocks early without fear of blame.",
+    ],
+  },
+  {
+    id: "collaborative-influence",
+    category: "Collaborative Communication",
+    title: "Collaborative Communication & Transparent Influence",
+    targetDimension: "Manipulating Followers",
+    duration: "9 min read",
+    objective: "Eliminate guilt-tripping and emotional manipulation in favor of transparent, respectful, and direct workplace dialogue.",
+    badExample: "After everything leadership has done for you, the least you could do is take on this weekend workload.",
+    goodExample: "We have an unexpected weekend coverage need. Let's discuss as a team who has capacity or how we can balance the schedule.",
+    habits: [
+      "State business objectives directly without attaching personal guilt or moral obligation.",
+      "Invite genuine two-way feedback before finalizing operational decisions.",
+      "Separate objective project needs from emotional leverage.",
+    ],
+  },
+  {
+    id: "autonomy-support",
+    category: "Autonomy Support",
+    title: "Autonomy Support & Follower Development",
+    targetDimension: "Undermining Development",
+    duration: "8 min read",
+    objective: "Foster junior and team initiative by mentoring through questions rather than micromanaging or dismissing independent thought.",
+    badExample: "Just stick to the instructions given; you don't have enough seniority to suggest changes.",
+    goodExample: "I value your initiative in looking at this process. Let's review your proposal together during our next 1-on-1.",
+    habits: [
+      "Ask 'What approach do you recommend?' before prescribing a solution.",
+      "Delegate problem ownership, not merely mechanical task execution.",
+      "Celebrate constructive experimentation and frame missteps as collective learning.",
+    ],
+  },
+];
+
+async function updateSidebarTrainingRecommendations(extraContext = {}) {
+  if (!elements.sidebarTrainingPanel || !elements.sidebarTrainingList) return;
+
+  const rows = state.dashboardSummary.emails || [];
+  const negativeRows = rows.filter(isNegativeSummaryRow);
+  const totalEmails = rows.length;
+  const negativeCount = negativeRows.length;
+  const composeAnalysis = state.composeResult?.analysis;
+
+  const negativeScore = composeAnalysis?.highestScore || (totalEmails > 0 ? (negativeCount / totalEmails) * 5 : 1);
+  const isEgoisticSkew = Boolean(extraContext.isEgoisticSkew || state.pronounBiasResult?.isEgoisticSkew);
+
+  const context = {
+    negativeScore,
+    isEgoisticSkew,
+    dimensions: composeAnalysis?.dimensions || [],
+    ...extraContext,
+  };
+
+  let modules = [];
+  try {
+    if (isElectron && analyzer?.getTrainingRecommendations) {
+      const res = analyzer.getTrainingRecommendations(context);
+      modules = res?.modules || [];
+    } else if (window.apiClient?.getTrainingRecommendations) {
+      const res = await window.apiClient.getTrainingRecommendations(context);
+      modules = res?.modules || [];
+    }
+  } catch (_e) {
+    // fallback
+  }
+
+  if (!modules || modules.length === 0) {
+    modules = FALLBACK_TRAINING_MODULES;
+  }
+
+  state.trainingModules = modules;
+
+  elements.sidebarTrainingList.innerHTML = modules
+    .slice(0, 3)
+    .map(
+      (m) => `
+        <div class="sidebar-training-card" data-training-id="${escapeHtml(m.id)}">
+          <div class="sidebar-training-card-header">
+            <span class="training-card-cat">${escapeHtml(m.category)}</span>
+            <span class="training-card-dur">${escapeHtml(m.duration)}</span>
+          </div>
+          <div class="training-card-title">${escapeHtml(m.title)}</div>
+          <button type="button" class="training-review-btn" data-training-review="${escapeHtml(m.id)}">
+            Review Module &rarr;
+          </button>
+        </div>
+      `
+    )
+    .join("");
+
+  elements.sidebarTrainingPanel.classList.remove("hidden");
+}
+
+function openTrainingModal(moduleId) {
+  const mod = (state.trainingModules || []).find((m) => m.id === moduleId) ||
+              FALLBACK_TRAINING_MODULES.find((m) => m.id === moduleId) ||
+              FALLBACK_TRAINING_MODULES[0];
+  if (!mod) return;
+
+  state.selectedTrainingModule = mod;
+
+  if (elements.trainingModalTitle) elements.trainingModalTitle.textContent = mod.title;
+  if (elements.trainingModalCategory) elements.trainingModalCategory.textContent = mod.category;
+  if (elements.trainingModalDuration) elements.trainingModalDuration.textContent = mod.duration;
+  if (elements.trainingModalTarget) elements.trainingModalTarget.textContent = `Target: ${mod.targetDimension}`;
+  if (elements.trainingModalObjective) elements.trainingModalObjective.textContent = mod.objective;
+  if (elements.trainingModalExampleBad) elements.trainingModalExampleBad.textContent = mod.badExample;
+  if (elements.trainingModalExampleGood) elements.trainingModalExampleGood.textContent = mod.goodExample;
+
+  if (elements.trainingModalHabits) {
+    elements.trainingModalHabits.innerHTML = (mod.habits || [])
+      .map((h) => `<li>${escapeHtml(h)}</li>`)
+      .join("");
+  }
+
+  openModal("training-modal");
 }
 
 async function selectPstFile() {
@@ -3485,47 +4108,83 @@ async function pollBiometrics() {
   if (!watchSessionId) return;
   
   try {
+    // Server returns { paired, connected, latest: { bpm, stressPercent, stressLevel, assessed, ... } }
     const data = await window.apiClient.getBiometrics(watchSessionId);
-    
-    if (data.status === "paired" && !watchConnected) {
+
+    if (data.paired && !watchConnected) {
       watchConnected = true;
       elements.watchPairingCode.classList.add("hidden");
       elements.biometricBadge.classList.remove("hidden");
     }
-    
-    if (watchConnected && data.status === "paired") {
+
+    if (watchConnected) {
       updateBiometricUI(data);
     }
   } catch (err) {
     console.error("Polling error:", err);
+    // Session expired / server restarted: let the user pair again.
+    if (/unknown session/i.test(err.message || "")) {
+      resetWatchPairing();
+    }
   }
 }
 
+function resetWatchPairing() {
+  if (watchPollInterval) clearInterval(watchPollInterval);
+  watchPollInterval = null;
+  watchSessionId = null;
+  watchConnected = false;
+  currentBpm = null;
+  currentStressLevel = "calm";
+  elements.watchPairingCode.classList.add("hidden");
+  elements.biometricBadge.classList.add("hidden");
+  elements.connectWatchBtn.classList.remove("hidden");
+  elements.connectWatchBtn.disabled = false;
+  elements.connectWatchBtn.textContent = "Connect Watch";
+}
+
 function updateBiometricUI(data) {
-  if (data.bpm) {
-    currentBpm = Math.round(data.bpm);
-    elements.bpmValue.textContent = `${currentBpm} BPM`;
+  const latest = data.latest;
+  const connectionLabel = document.getElementById("watch-connection-label");
+  if (connectionLabel) {
+    connectionLabel.textContent = data.connected ? "Watch connected" : "Watch not connected";
+    connectionLabel.style.color = data.connected ? "var(--green)" : "var(--muted)";
   }
-  
-  if (typeof data.stressScore === "number") {
-    let level = "Calm";
-    let color = "var(--success)"; // green
-    currentStressLevel = "calm";
-    
-    if (data.stressScore > 75) {
-      level = "High Stress";
-      color = "var(--error)"; // red
-      currentStressLevel = "high";
-    } else if (data.stressScore > 50) {
-      level = "Elevated";
-      color = "var(--warning)"; // yellow
-      currentStressLevel = "elevated";
-    }
-    
-    elements.stressLevelLabel.textContent = level;
-    elements.stressLevelLabel.style.color = color;
-    elements.bpmValue.style.color = color;
+
+  if (!latest || !data.connected) {
+    // Paired but no fresh sample in the last 30 s: don't feed stale data into analysis.
+    currentBpm = null;
+    elements.bpmValue.textContent = "-- BPM";
+    elements.bpmValue.style.color = "";
+    elements.stressLevelLabel.textContent = "No live data";
+    elements.stressLevelLabel.style.color = "var(--muted)";
+    return;
   }
+
+  currentBpm = Math.round(latest.bpm);
+  elements.bpmValue.textContent = `${currentBpm} BPM`;
+
+  // Same thresholds as biometrics.js computeStress(): <30 Calm, 30-59 Elevated, 60+ High Stress.
+  let label = "Normal";
+  let color = "var(--green)";
+  currentStressLevel = "calm";
+  if (!latest.assessed) {
+    label = "Moving - not assessed";
+    color = "var(--muted)";
+    currentStressLevel = "not assessed (moving)";
+  } else if (latest.stressPercent >= 60) {
+    label = "Tense / High stress";
+    color = "var(--red)";
+    currentStressLevel = "high";
+  } else if (latest.stressPercent >= 30) {
+    label = "Elevated";
+    color = "var(--yellow)";
+    currentStressLevel = "elevated";
+  }
+
+  elements.stressLevelLabel.textContent = label;
+  elements.stressLevelLabel.style.color = color;
+  elements.bpmValue.style.color = color;
 }
 
 
@@ -3725,6 +4384,8 @@ function bindEvents() {
     hideLiveWarning({ keepHighlights: true });
     refreshComposeHighlightsFromCurrentText();
     scheduleLiveWarningAnalysis({ keepHighlights: true });
+    scheduleAutocomplete();
+    handleComposePronounBias();
     if (!state.isComposeAnalyzing) {
       setComposeStatus(
         state.liveWarningEnabled
@@ -3733,6 +4394,27 @@ function bindEvents() {
       );
       setControls();
     }
+  });
+  elements.composeBody.addEventListener("keydown", (event) => {
+    if (state.autocompleteSuggestion && (event.key === "Tab" || event.key === "ArrowRight")) {
+      const isAtEnd = elements.composeBody.selectionStart === elements.composeBody.value.length;
+      if (event.key === "Tab" || (event.key === "ArrowRight" && isAtEnd)) {
+        event.preventDefault();
+        acceptAutocomplete();
+        return;
+      }
+    } else if (event.key === "Escape" && state.autocompleteSuggestion) {
+      event.preventDefault();
+      hideAutocomplete({ dismiss: true });
+      return;
+    }
+  });
+  elements.composeAutocompleteDismiss?.addEventListener("click", () => {
+    hideAutocomplete({ dismiss: true });
+  });
+  elements.biasApplyBtn?.addEventListener("click", applyTeamCentricPhrasing);
+  elements.biasDismissBtn?.addEventListener("click", () => {
+    hidePronounBiasBanner({ dismiss: true });
   });
   elements.composeBody.addEventListener("scroll", syncComposeHighlightScroll);
   elements.composeBody.addEventListener("mousemove", showComposeHighlightTooltipAtPoint);
@@ -3815,6 +4497,13 @@ function bindEvents() {
       return;
     }
 
+    const trainingBtn = target.closest("[data-training-review]");
+    if (trainingBtn) {
+      const moduleId = trainingBtn.getAttribute("data-training-review");
+      openTrainingModal(moduleId);
+      return;
+    }
+
     const modalId = target.getAttribute("data-close-modal");
     if (modalId) {
       closeModal(modalId);
@@ -3853,6 +4542,7 @@ async function init() {
   switchView(initialView.view, initialView.view === "reports" ? initialView.period : "");
   await loadComposeLogPath();
   await loadSettings();
+  updateSidebarTrainingRecommendations();
 }
 
 document.addEventListener("DOMContentLoaded", init);
