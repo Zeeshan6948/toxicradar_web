@@ -1,8 +1,8 @@
 {
   "name": "toxicradar-desktop",
   "version": "1.0.1",
-  "description": "Electron desktop app for message analysis, live warning, rewrites, and Excel-based reporting.",
-  "author": "ToxicRadar",
+  "description": "Exploitative Leadership Detection and communication coaching platform.",
+  "author": "Exploitative Leadership Detection",
   "main": "main.js",
   "scripts": {
     "start": "node server.js",
@@ -13,7 +13,7 @@
   },
   "build": {
     "appId": "com.toxicradar.desktop",
-    "productName": "ToxicRadar",
+    "productName": "Exploitative Leadership Detection",
     "directories": {
       "output": "release"
     },
@@ -44,7 +44,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "ToxicRadar"
+      "shortcutName": "Exploitative Leadership Detection"
     }
   },
   "dependencies": {

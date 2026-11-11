@@ -160,7 +160,7 @@ function createMainWindow() {
     minHeight: 760,
     icon: getAppIconPath(),
     backgroundColor: "#0f1117",
-    title: "ToxicRadar",
+    title: "Exploitative Leadership Detection and Mitigation Tool",
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -223,8 +223,8 @@ function showUsageReminderNotification() {
     ? nativeImage.createFromPath(NOTIFICATION_ICON_PATH)
     : undefined;
   const notification = new Notification({
-    title: "ToxicRadar Reminder",
-    body: "Time to review your communication trends in ToxicRadar.",
+    title: "Exploitative Leadership Detection Reminder",
+    body: "Time to review your communication trends in Exploitative Leadership Detection.",
     icon,
     silent: false,
   });
@@ -383,7 +383,7 @@ ipcMain.handle("dialog:select-pst", async () => {
 ipcMain.handle("dialog:save-export", async (_event, defaultFileName) => {
   const result = await dialog.showSaveDialog({
     title: "Export Analysis Results",
-    defaultPath: defaultFileName || "ToxicRadar-Batch-Analysis.xlsx",
+    defaultPath: defaultFileName || "Exploitative-Leadership-Batch-Analysis.xlsx",
     filters: [{ name: "Excel Workbook", extensions: ["xlsx"] }],
   });
 
@@ -509,10 +509,10 @@ ipcMain.handle("outlook:export-sent-pst", async (_event, payload = {}) => {
 });
 
 app.whenReady().then(() => {
-  app.setName("ToxicRadar");
+  app.setName("Exploitative Leadership Detection");
 
   if (process.platform === "win32") {
-    app.setAppUserModelId("ToxicRadar.Desktop");
+    app.setAppUserModelId("ExploitativeLeadershipDetection.Desktop");
   }
 
   createMainWindow();

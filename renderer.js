@@ -302,9 +302,44 @@ function cacheDom() {
   elements.trainingModalExampleBad = document.getElementById("training-modal-example-bad");
   elements.trainingModalExampleGood = document.getElementById("training-modal-example-good");
   elements.trainingModalHabits = document.getElementById("training-modal-habits");
+  elements.guideBtn = document.getElementById("guide-btn");
+  elements.sidebarGuideBtn = document.getElementById("sidebar-guide-btn");
+  elements.heroGuideBtn = document.getElementById("hero-guide-btn");
+  elements.guideModal = document.getElementById("guide-modal");
+  elements.guideTabButtons = Array.from(document.querySelectorAll(".guide-tab-btn"));
+  elements.guideTabPanes = Array.from(document.querySelectorAll(".guide-tab-pane"));
   elements.summaryMetricTooltip = document.createElement("div");
   elements.summaryMetricTooltip.className = "summary-metric-tooltip";
   document.body.appendChild(elements.summaryMetricTooltip);
+}
+
+function switchGuideTab(targetTab) {
+  if (!targetTab) return;
+  (elements.guideTabButtons || []).forEach((btn) => {
+    const isActive = btn.getAttribute("data-guide-tab") === targetTab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  (elements.guideTabPanes || []).forEach((pane) => {
+    pane.classList.toggle("active", pane.getAttribute("data-guide-pane") === targetTab);
+  });
+}
+
+function initGuideModal() {
+  (elements.guideTabButtons || []).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.getAttribute("data-guide-tab");
+      if (tab) switchGuideTab(tab);
+    });
+  });
+
+  const openGuide = () => {
+    openModal("guide-modal");
+  };
+
+  elements.guideBtn?.addEventListener("click", openGuide);
+  elements.sidebarGuideBtn?.addEventListener("click", openGuide);
+  elements.heroGuideBtn?.addEventListener("click", openGuide);
 }
 
 function getSavedTheme() {
@@ -3192,7 +3227,7 @@ async function loadComposeLogPath() {
     state.composeLogPath = await ipcRenderer.invoke("compose:get-log-path");
   } else {
     const settings = await window.apiClient.getSettings();
-    state.composeLogPath = settings?.excelPath || "ToxicRadar-Compose-Log.xlsx";
+    state.composeLogPath = settings?.excelPath || "Exploitative-Leadership-Compose-Log.xlsx";
   }
 
   await refreshExcelDashboard({ silent: true });
@@ -3953,7 +3988,7 @@ async function exportToExcel() {
   if (isElectron) {
     const exportPath = await ipcRenderer.invoke(
       "dialog:save-export",
-      "ToxicRadar-Batch-Analysis.xlsx"
+      "Exploitative-Leadership-Batch-Analysis.xlsx"
     );
 
     if (!exportPath) return;
@@ -4532,6 +4567,7 @@ async function init() {
   cacheDom();
   applyUiPreferences();
   bindEvents();
+  initGuideModal();
   renderSummary();
   renderComposeResult();
   renderEmptyTable();
@@ -4543,6 +4579,7 @@ async function init() {
   await loadComposeLogPath();
   await loadSettings();
   updateSidebarTrainingRecommendations();
+  openModal("guide-modal");
 }
 
 document.addEventListener("DOMContentLoaded", init);

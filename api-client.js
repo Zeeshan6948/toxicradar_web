@@ -1,5 +1,5 @@
 /**
- * ToxicRadar Web API Client
+ * Exploitative Leadership Detection Web API Client
  * Provides web-native replacements for Electron IPC & Node filesystem operations
  */
 (function () {
@@ -103,7 +103,7 @@
     downloadExcel() {
       const downloadLink = document.createElement("a");
       downloadLink.href = "/api/excel/download?t=" + Date.now();
-      downloadLink.setAttribute("download", "ToxicRadar-Compose-Log.xlsx");
+      downloadLink.setAttribute("download", "Exploitative-Leadership-Compose-Log.xlsx");
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -142,7 +142,7 @@
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "ToxicRadar-Export.xlsx";
+      a.download = "Exploitative-Leadership-Export.xlsx";
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

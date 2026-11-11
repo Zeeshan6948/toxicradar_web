@@ -240,9 +240,9 @@ app.get("/api/excel/download", async (req, res) => {
   let tempPath = null;
   try {
     const records = await store.listRecords({ force: true });
-    tempPath = path.join(UPLOADS_DIR, `ToxicRadar-Log-${Date.now()}.xlsx`);
+    tempPath = path.join(UPLOADS_DIR, `Exploitative-Leadership-Log-${Date.now()}.xlsx`);
     exporter.exportResults(records, tempPath);
-    res.download(tempPath, "ToxicRadar-Compose-Log.xlsx", () => {
+    res.download(tempPath, "Exploitative-Leadership-Compose-Log.xlsx", () => {
       try {
         fs.unlinkSync(tempPath);
       } catch (_e) {}
@@ -270,7 +270,7 @@ app.post("/api/excel/upload", uploadExcel.single("file"), async (req, res) => {
     try {
       records = exporter.parseExcelRecords(tempPath);
     } catch (parseError) {
-      return res.status(400).json({ error: "That file could not be read as a ToxicRadar Excel log." });
+      return res.status(400).json({ error: "That file could not be read as an Exploitative Leadership Detection Excel log." });
     }
     if (!records.length) {
       return res.status(400).json({ error: "No email rows were found in that Excel file." });
@@ -330,10 +330,10 @@ app.post("/api/export", (req, res) => {
       return res.status(400).json({ error: "Results array is required." });
     }
 
-    const exportPath = path.join(UPLOADS_DIR, `ToxicRadar-Export-${Date.now()}.xlsx`);
+    const exportPath = path.join(UPLOADS_DIR, `Exploitative-Leadership-Export-${Date.now()}.xlsx`);
     exporter.exportResults(results, exportPath);
 
-    res.download(exportPath, "ToxicRadar-Export.xlsx", () => {
+    res.download(exportPath, "Exploitative-Leadership-Export.xlsx", () => {
       try {
         fs.unlinkSync(exportPath);
       } catch (_e) {}
@@ -413,7 +413,7 @@ app.get("/privacy", (req, res) => {
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", app: "ToxicRadar Web", version: "1.0.1" });
+  res.json({ status: "ok", app: "Exploitative Leadership Detection Web", version: "1.0.1" });
 });
 
 // Startup warm-up for Render spin-ups. Email records are read straight from
@@ -443,7 +443,7 @@ async function rehydrateFromFirebase() {
 // Start Server
 const server = app.listen(PORT, async () => {
   console.log(`=============================================`);
-  console.log(`🚀 ToxicRadar Web running at: http://localhost:${PORT}`);
+  console.log(`🚀 Exploitative Leadership Detection Web running at: http://localhost:${PORT}`);
   console.log(`🗄️  Storage: ${firebase.isConfigured() ? "Firebase (no local data files)" : "in-memory (Firebase not configured)"}`);
   if (firebase.isConfigured()) {
     console.log(`🔥 Firebase storage: Connected (${process.env.FIREBASE_PROJECT_ID || "Realtime DB"})`);
@@ -456,15 +456,15 @@ const server = app.listen(PORT, async () => {
 
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
-    console.error(`\n❌ [ToxicRadar Server] Port ${PORT} is already in use!`);
-    console.error(`   Another instance of ToxicRadar or another process is running on this port.`);
+    console.error(`\n❌ [Exploitative Leadership Detection Server] Port ${PORT} is already in use!`);
+    console.error(`   Another instance of Exploitative Leadership Detection or another process is running on this port.`);
     console.error(`\n👉 To free up port ${PORT}, run this command in your terminal:`);
     console.error(`   kill -9 $(lsof -t -i:${PORT})`);
     console.error(`\n👉 Alternatively, start the server on a different port:`);
     console.error(`   PORT=3001 npm start\n`);
     process.exit(1);
   } else {
-    console.error("❌ [ToxicRadar Server] Unexpected server error:", err);
+    console.error("❌ [Exploitative Leadership Detection Server] Unexpected server error:", err);
     process.exit(1);
   }
 });

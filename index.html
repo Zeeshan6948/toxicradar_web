@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ToxicRadar</title>
+    <title>Exploitative Leadership Detection</title>
     <link rel="stylesheet" href="style.css" />
     <script>
       (function () {
@@ -17,7 +17,7 @@
       <aside class="sidebar-nav">
         <div class="brand-block">
           <p class="eyebrow">Leadership Communication Lab</p>
-          <h1>ToxicRadar</h1>
+          <h1>Exploitative Leadership Detection</h1>
         </div>
 
         <nav class="nav-list">
@@ -28,6 +28,9 @@
           <button class="nav-btn" data-view="reports" data-period="30">Monthly Report</button>
           <button class="nav-btn" data-view="reports" data-period="90">Yearly Report</button>
           <button class="nav-btn" data-view="reports" data-period="all">Total History</button>
+          <button id="sidebar-guide-btn" type="button" class="nav-btn guide-nav-btn">
+            <span class="guide-nav-icon">💡</span> Tool Guide & Graphs
+          </button>
         </nav>
 
         <div id="sidebar-training-panel" class="sidebar-training-panel hidden">
@@ -43,17 +46,32 @@
       </aside>
 
       <main class="workspace">
-        <button id="settings-btn" type="button" class="settings-icon-btn" aria-label="Settings" title="Settings">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
-            <path d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" />
-          </svg>
-        </button>
+        <div class="workspace-top-actions">
+          <button id="guide-btn" type="button" class="guide-action-btn" aria-label="Tool Guide & How Graphs Work" title="Tool Guide & How Graphs Work">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            <span>Guide & Graphs</span>
+          </button>
+          <button id="settings-btn" type="button" class="settings-icon-btn" aria-label="Settings" title="Settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+              <path d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" />
+            </svg>
+          </button>
+        </div>
         <section id="overview-view" class="workspace-view active">
           <header class="hero-banner">
-            <p class="hero-line">
-              Effective leaders typically use respectful and autonomy-supportive communication
-            </p>
+            <div class="hero-banner-content">
+              <p class="hero-line">
+                Effective leaders typically use respectful and autonomy-supportive communication
+              </p>
+              <button id="hero-guide-btn" type="button" class="hero-guide-btn">
+                <span class="guide-sparkle">ℹ️</span> How does this tool work & what are the graphs for?
+              </button>
+            </div>
           </header>
 
           <section class="headline-metrics">
@@ -543,6 +561,385 @@
         </div>
 
         <p id="settings-feedback" class="muted"></p>
+      </div>
+    </div>
+
+    <!-- Application Guide & Graphs Reference Modal -->
+    <div id="guide-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="guide-modal-title">
+      <div class="modal-backdrop" data-close-modal="guide-modal"></div>
+      <div class="modal-panel guide-modal-panel">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow green">Interactive Knowledge Base & User Manual</p>
+            <h3 id="guide-modal-title">Exploitative Leadership Detection — Complete Guide</h3>
+          </div>
+          <button class="modal-close-btn" type="button" data-close-modal="guide-modal" aria-label="Close guide modal">
+            &times;
+          </button>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="guide-tabs" role="tablist">
+          <button type="button" class="guide-tab-btn active" data-guide-tab="about" role="tab" aria-selected="true">
+            <span class="tab-icon">🎯</span> What is This Tool?
+          </button>
+          <button type="button" class="guide-tab-btn" data-guide-tab="how-to-use" role="tab" aria-selected="false">
+            <span class="tab-icon">🚀</span> How to Use It
+          </button>
+          <button type="button" class="guide-tab-btn" data-guide-tab="graphs" role="tab" aria-selected="false">
+            <span class="tab-icon">📊</span> What the Graphs Are For
+          </button>
+          <button type="button" class="guide-tab-btn" data-guide-tab="dimensions" role="tab" aria-selected="false">
+            <span class="tab-icon">🔬</span> The 5 Behavioral Dimensions
+          </button>
+        </div>
+
+        <!-- Modal Body with Scrollable Tab Panes -->
+        <div class="guide-modal-body">
+          <!-- TAB 1: What is This Tool? -->
+          <div class="guide-tab-pane active" data-guide-pane="about" role="tabpanel">
+            <div class="guide-intro-banner">
+              <div class="guide-intro-badge">Core Mission</div>
+              <h4>Empowering Leaders with Psychological Safety & Constructive Communication</h4>
+              <p>
+                <strong>Exploitative Leadership Detection (ELD)</strong> is an AI-powered workplace communication coaching and organizational intelligence platform. It analyzes drafted messages, real-time writing, and historical mailbox archives to identify, explain, and de-escalate exploitative, self-centered, or manipulative communication patterns before they damage team trust.
+              </p>
+            </div>
+
+            <div class="guide-cards-grid">
+              <div class="guide-card">
+                <div class="guide-card-icon">⚡</div>
+                <div class="guide-card-content">
+                  <h5>Why This Tool Exists</h5>
+                  <p>
+                    In fast-paced, high-stakes environments, well-intentioned leaders often slip into anxiety-inducing pressure, excessive self-referencing, or subtle guilt-tripping. These patterns silently erode psychological safety, trigger burnout, and drive top performers away. ELD provides an objective, private, and constructive feedback loop.
+                  </p>
+                </div>
+              </div>
+
+              <div class="guide-card">
+                <div class="guide-card-icon">🔬</div>
+                <div class="guide-card-content">
+                  <h5>Academic Foundation (ELTC Model)</h5>
+                  <p>
+                    Unlike generic sentiment analysis tools that only categorize text as positive or negative, ELD is grounded in the validated <strong>Exploitative Leadership in Teams & Corporations (ELTC)</strong> research framework (Schmid et al.), diagnosing 5 distinct dimensions of managerial behavior.
+                  </p>
+                </div>
+              </div>
+
+              <div class="guide-card">
+                <div class="guide-card-icon">🛡️</div>
+                <div class="guide-card-content">
+                  <h5>Real-Time Pre-Send Coaching</h5>
+                  <p>
+                    Draft emails with confidence. ELD provides real-time collaborative autocomplete, pronoun bias detection ("I/Me" vs. "We/Team"), live warning guardrails, and 1-click constructive rewrite suggestions before you click send.
+                  </p>
+                </div>
+              </div>
+
+              <div class="guide-card">
+                <div class="guide-card-icon">📊</div>
+                <div class="guide-card-content">
+                  <h5>Departmental & Longitudinal Audits</h5>
+                  <p>
+                    Upload Outlook PST sent archives or spreadsheet logs to assess communication trends over days, weeks, months, or years, verifying whether coaching interventions are successfully fostering psychological safety.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: How to Use It -->
+          <div class="guide-tab-pane" data-guide-pane="how-to-use" role="tabpanel">
+            <div class="guide-steps-container">
+              <div class="guide-step-card">
+                <div class="guide-step-number">1</div>
+                <div class="guide-step-body">
+                  <h5>Drafting & Real-Time Coaching ("New Message+")</h5>
+                  <p>Navigate to <strong>New Message+</strong> in the sidebar to compose or paste an email draft:</p>
+                  <ul class="guide-feature-list">
+                    <li>
+                      <strong>✨ Non-Exploitative Inline Autocomplete:</strong> Pause typing for 350ms to see collaborative continuations. Press <kbd>Tab</kbd> or <kbd>→</kbd> to accept, or <kbd>Esc</kbd> to dismiss.
+                    </li>
+                    <li>
+                      <strong>⚖️ Egoistic Pronoun Bias Detection:</strong> If your draft over-indexes on self-credit ("I completed", "my project"), an alert banner displays the exact pronoun split. Click <strong>Apply Team Framing</strong> to automatically convert text to shared team ownership.
+                    </li>
+                    <li>
+                      <strong>🚨 Live Warning Toggle:</strong> Turn on Live Warning above the editor for continuous real-time tone monitoring as you type.
+                    </li>
+                    <li>
+                      <strong>🔍 Send for Analysis:</strong> Generates a full 5-dimension score breakdown, highlights risky phrases, and provides an actionable <strong>Suggested Rewrite</strong> that can be applied with one click.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guide-step-card">
+                <div class="guide-step-number">2</div>
+                <div class="guide-step-body">
+                  <h5>Auditing Historical Archives & Outlook PST ("Overview")</h5>
+                  <p>Navigate to <strong>Overview</strong> to audit past organizational communications:</p>
+                  <ul class="guide-feature-list">
+                    <li>
+                      <strong>📁 Import Sent Archives:</strong> Click <strong>Choose PST File</strong> to parse an Outlook archive or upload existing Excel logs.
+                    </li>
+                    <li>
+                      <strong>☁️ Persistent Firebase Storage:</strong> All analyzed records, dimension scores, and balance factors survive server restarts and inactivity sleep cycles.
+                    </li>
+                    <li>
+                      <strong>📑 Filter by Risk Tier:</strong> Click the <strong>Negative</strong>, <strong>Neutral</strong>, or <strong>Positive</strong> headline badges to filter the email summary table.
+                    </li>
+                    <li>
+                      <strong>🔎 Verbatim Evidence Inspection:</strong> Click <strong>Details</strong> on any email to view verbatim quotes, score ratings, and coaching notes for each of the 5 dimensions.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="guide-step-card">
+                <div class="guide-step-number">3</div>
+                <div class="guide-step-body">
+                  <h5>Targeted Leadership Coaching (Left Sidebar)</h5>
+                  <p>Turn detected communication risks into measurable skill development:</p>
+                  <ul class="guide-feature-list">
+                    <li>
+                      <strong>🎓 Contextual Recommendations:</strong> The left sidebar automatically surfaces coaching modules (Servant Leadership, Psychological Safety, Collaborative Influence, Autonomy Support) based on detected patterns.
+                    </li>
+                    <li>
+                      <strong>💡 Interactive Learning Modal:</strong> Click <strong>Review Module &rarr;</strong> to study side-by-side Before/After email comparisons and actionable daily leadership habits.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: What the Graphs Are For -->
+          <div class="guide-tab-pane" data-guide-pane="graphs" role="tabpanel">
+            <div class="guide-intro-banner">
+              <div class="guide-intro-badge">Visualization Guide</div>
+              <h4>How to Interpret Metrics, Charts, and Analytics Across ToxicRadar</h4>
+              <p>
+                Every visualization in the platform is purposefully designed to give leaders and HR coaches actionable insight into workplace psychological safety and communication dynamics.
+              </p>
+            </div>
+
+            <div class="guide-graph-sections">
+              <!-- Graph Section 1: Overview Headline Cards -->
+              <div class="guide-graph-item">
+                <div class="guide-graph-head">
+                  <span class="guide-graph-tag">Overview Dashboard</span>
+                  <h5>1. Headline KPI Status Cards (Negative, Neutral, Positive %)</h5>
+                </div>
+                <p class="guide-graph-desc">
+                  Located at the top of the Overview view, these three KPI badges summarize the health distribution across all analyzed emails:
+                </p>
+                <div class="guide-kpi-grid">
+                  <div class="guide-kpi-item neg">
+                    <span class="kpi-pill red">🔴 Negative % (High Risk)</span>
+                    <p><strong>What it measures:</strong> Percentage of messages scoring $\ge 4$ or flagged for critical exploitative behaviors.</p>
+                    <p><strong>Action:</strong> Click this card to immediately filter the table below to review all high-risk communications.</p>
+                  </div>
+                  <div class="guide-kpi-item neu">
+                    <span class="kpi-pill yellow">🟡 Neutral % (Borderline)</span>
+                    <p><strong>What it measures:</strong> Percentage of messages scoring exactly 3. Functional and transactional, but often lacking collaborative warmth or psychological safety reassurance.</p>
+                  </div>
+                  <div class="guide-kpi-item pos">
+                    <span class="kpi-pill green">🟢 Positive % (Constructive)</span>
+                    <p><strong>What it measures:</strong> Percentage of messages scoring 1 or 2 (respectful, collaborative, and autonomy-supportive).</p>
+                    <p><strong>Goal:</strong> High-trust organizations aim to maintain Positive % above 80%.</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Graph Section 2: Dimension Breakdown -->
+              <div class="guide-graph-item">
+                <div class="guide-graph-head">
+                  <span class="guide-graph-tag">Reports View</span>
+                  <h5>2. Dimension Score Breakdown (0–100 Quality Scale)</h5>
+                </div>
+                <p class="guide-graph-desc">
+                  Evaluates communications across the 5 validated ELTC dimensions on a standardized <strong>0 to 100 Communication Quality Scale</strong>:
+                </p>
+                <div class="guide-callout-box">
+                  <strong>Scale Formula:</strong> <code>Quality Score = ((5 - average_dimension_score) / 4) * 100</code>
+                  <br />
+                  <strong>100 Points:</strong> Flawless servant leadership with zero exploitative markers.
+                  <br />
+                  <strong>&lt; 50 Points:</strong> Severe exploitative behavior requiring immediate coaching.
+                </div>
+                <p class="guide-graph-purpose">
+                  <strong>Why it matters:</strong> An overall toxicity score alone cannot diagnose the problem. The dimension breakdown pinpoints whether the root cause is <em>Exerting Pressure</em> during deadlines, <em>Genuine Egoistic Behaviors</em> in status updates, or <em>Undermining Development</em> in feedback.
+                </p>
+              </div>
+
+              <!-- Graph Section 3: Time Series Histograms & Lines -->
+              <div class="guide-graph-item">
+                <div class="guide-graph-head">
+                  <span class="guide-graph-tag">Reports View</span>
+                  <h5>3. Time-Series Histograms & Multi-Series Trends (Daily, Monthly, Yearly)</h5>
+                </div>
+                <p class="guide-graph-desc">
+                  Tracks communication trends longitudinally across selectable timeframes (Today, 7 Days, 30 Days, 90 Days, Total History):
+                </p>
+                <ul class="guide-feature-list">
+                  <li>
+                    <strong>Message Volume Mode ("count"):</strong> Displays total emails sent per day, week, or month, stacked by Negative (Red), Neutral (Yellow), and Positive (Green) volume.
+                  </li>
+                  <li>
+                    <strong>High Risk % Mode ("riskPercent"):</strong> Plots the percentage of toxic emails over time. Allows leadership coaches to evaluate whether training and awareness are driving toxic communication down week-over-week.
+                  </li>
+                  <li>
+                    <strong>Chart Type Switcher:</strong> Switch dynamically between <em>Grouped Bar</em>, <em>Multi-Series Line</em>, or <em>Donut/Pie</em> distributions.
+                  </li>
+                  <li>
+                    <strong>Interactive Calendar:</strong> Step backward and forward through history or pick specific calendar dates to inspect historical incidents.
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Graph Section 4: Weekly Balance Graph -->
+              <div class="guide-graph-item">
+                <div class="guide-graph-head">
+                  <span class="guide-graph-tag">Weekly Report (7 Days)</span>
+                  <h5>4. Weekly Positive vs. Negative Balance Graph</h5>
+                </div>
+                <p class="guide-graph-desc">
+                  When viewing the <strong>Weekly Report (7 Days)</strong>, a dedicated dual-bar balance graph compares daily communication factors:
+                </p>
+                <div class="guide-kpi-grid">
+                  <div class="guide-kpi-item pos">
+                    <span class="kpi-pill green">🟢 Green Bar (Positive / Collective Factor)</span>
+                    <p>Points accumulated from collective identifiers ("we", "team", "together"), constructive tone, and autonomy support.</p>
+                  </div>
+                  <div class="guide-kpi-item neg">
+                    <span class="kpi-pill red">🔴 Orange/Red Bar (Negative / Pressure Factor)</span>
+                    <p>Points accumulated from self-centered pronouns ("I", "me", "my"), urgency pressure, ultimatums, and manipulation.</p>
+                  </div>
+                </div>
+                <p class="guide-graph-purpose" style="margin-top: 10px;">
+                  <strong>Actionable Target:</strong> The green bar should consistently outweigh the red bar each day. If the red bar spikes on a particular day, hover over the bar to inspect message volume and balance ratio, then review that day's communications to de-escalate tension.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: The 5 Behavioral Dimensions -->
+          <div class="guide-tab-pane" data-guide-pane="dimensions" role="tabpanel">
+            <div class="guide-intro-banner">
+              <div class="guide-intro-badge">Academic Framework</div>
+              <h4>The 5 Dimensions of Exploitative Leadership (ELTC)</h4>
+              <p>
+                The platform assesses communication using the five validated dimensions established in organizational behavior research by Schmid, Verdorfer, and Peus:
+              </p>
+            </div>
+
+            <div class="guide-dimension-cards">
+              <div class="guide-dim-card">
+                <div class="guide-dim-header">
+                  <span class="dim-num">01</span>
+                  <h5>Genuine Egoistic Behaviors</h5>
+                  <span class="dim-badge ego">Self-Credit & Self-Interest</span>
+                </div>
+                <p class="dim-definition">
+                  Prioritizing the leader's personal status, credit, and self-promotion above the well-being, workload, and psychological safety of subordinates.
+                </p>
+                <div class="dim-comparison">
+                  <div class="dim-box bad">
+                    <strong>❌ Problematic:</strong> "I completed this project myself and I achieved outstanding results for my organization."
+                  </div>
+                  <div class="dim-box good">
+                    <strong>✅ Constructive:</strong> "Our team completed this project together and achieved outstanding milestones for our organization."
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-dim-card">
+                <div class="guide-dim-header">
+                  <span class="dim-num">02</span>
+                  <h5>Taking Credit</h5>
+                  <span class="dim-badge credit">Appropriating Output</span>
+                </div>
+                <p class="dim-definition">
+                  Claiming personal ownership of accomplishments, ideas, or work delivered by team members without giving appropriate attribution.
+                </p>
+                <div class="dim-comparison">
+                  <div class="dim-box bad">
+                    <strong>❌ Problematic:</strong> "I resolved the client escalation and redesigned the entire system over the weekend."
+                  </div>
+                  <div class="dim-box good">
+                    <strong>✅ Constructive:</strong> "Thanks to the dedication of our engineering team, we resolved the client escalation together."
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-dim-card">
+                <div class="guide-dim-header">
+                  <span class="dim-num">03</span>
+                  <h5>Exerting Pressure</h5>
+                  <span class="dim-badge pressure">Intimidation & Ultimatums</span>
+                </div>
+                <p class="dim-definition">
+                  Relying on anxiety, artificial urgency, implied penalties, or aggressive ultimatums to drive compliance and accelerate output.
+                </p>
+                <div class="dim-comparison">
+                  <div class="dim-box bad">
+                    <strong>❌ Problematic:</strong> "Get this finished by 5 PM today or don't bother showing up tomorrow."
+                  </div>
+                  <div class="dim-box good">
+                    <strong>✅ Constructive:</strong> "Our target is 5 PM today. Please let me know early if you encounter blockers so we can support you."
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-dim-card">
+                <div class="guide-dim-header">
+                  <span class="dim-num">04</span>
+                  <h5>Undermining Development</h5>
+                  <span class="dim-badge dev">Autonomy Restriction</span>
+                </div>
+                <p class="dim-definition">
+                  Suppressing junior initiative, discouraging independent thought, micromanaging execution, or keeping subordinates dependent.
+                </p>
+                <div class="dim-comparison">
+                  <div class="dim-box bad">
+                    <strong>❌ Problematic:</strong> "Just stick to the instructions given; you don't have enough seniority to question our process."
+                  </div>
+                  <div class="dim-box good">
+                    <strong>✅ Constructive:</strong> "I value your initiative in reviewing this process. Let's discuss your proposal together in our next sync."
+                  </div>
+                </div>
+              </div>
+
+              <div class="guide-dim-card">
+                <div class="guide-dim-header">
+                  <span class="dim-num">05</span>
+                  <h5>Manipulating Followers</h5>
+                  <span class="dim-badge manip">Emotional Coercion</span>
+                </div>
+                <p class="dim-definition">
+                  Using guilt-tripping, personal obligations, or emotional leverage to coerce extra work or extract compliance.
+                </p>
+                <div class="dim-comparison">
+                  <div class="dim-box bad">
+                    <strong>❌ Problematic:</strong> "After everything I've done for your career, the least you could do is take on this weekend workload."
+                  </div>
+                  <div class="dim-box good">
+                    <strong>✅ Constructive:</strong> "We have an unexpected weekend coverage need. Let's discuss as a team who has capacity or how we can balance it."
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer Actions -->
+        <div class="modal-actions guide-modal-actions">
+          <div class="guide-tip-pill">
+            <span>💡 Pro Tip:</span> You can re-open this guide anytime via the <strong>Guide & Graphs</strong> button in the top right or sidebar.
+          </div>
+          <button type="button" class="accent-btn" data-close-modal="guide-modal">Got it, Let's Get Started</button>
+        </div>
       </div>
     </div>
 
